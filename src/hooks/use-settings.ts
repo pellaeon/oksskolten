@@ -1,0 +1,314 @@
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import useSWR from 'swr'
+import { useDarkMode } from './use-dark-mode'
+import { useTheme } from './use-theme'
+import { useDateMode } from './use-date-mode'
+import { useAutoMarkRead } from './use-auto-mark-read'
+import { useUnreadIndicator } from './use-unread-indicator'
+import { useInternalLinks } from './use-internal-links'
+import { useShowThumbnails } from './use-show-thumbnails'
+import { useShowFeedActivity } from './use-show-feed-activity'
+import { useChatPosition } from './use-chat-position'
+import { useHighlightTheme } from './use-highlight-theme'
+import { useArticleFont } from './use-article-font'
+import { useLayout } from './use-layout'
+import { useMascot, type MascotChoice } from './use-mascot'
+import type { LayoutName } from '../data/layouts'
+import { fetcher, apiPatch, authHeaders } from '../lib/fetcher'
+
+/** Debounce delay (ms) before syncing settings to backend */
+const SETTINGS_SYNC_DEBOUNCE_MS = 500
+
+interface Prefs {
+  'appearance.color_theme': string | null
+  'reading.date_mode': string | null
+  'reading.auto_mark_read': string | null
+  'reading.unread_indicator': string | null
+  'reading.internal_links': string | null
+  'reading.show_thumbnails': string | null
+  'reading.show_feed_activity': string | null
+  'appearance.highlight_theme': string | null
+  'appearance.font_family': string | null
+  'reading.chat_position': string | null
+  'appearance.list_layout': string | null
+  'appearance.mascot': string | null
+  'chat.provider': string | null
+  'chat.model': string | null
+  'summary.provider': string | null
+  'summary.model': string | null
+  'translate.provider': string | null
+  'translate.model': string | null
+}
+
+export function useSettings() {
+  const { isDark, colorMode, setColorMode } = useDarkMode()
+  const { themeName, setTheme, themes } = useTheme(isDark)
+  const { dateMode, setDateMode } = useDateMode()
+  const { autoMarkRead, setAutoMarkRead } = useAutoMarkRead()
+  const { showUnreadIndicator, setShowUnreadIndicator } = useUnreadIndicator()
+  const { internalLinks, setInternalLinks } = useInternalLinks()
+  const currentTheme = themes.find(t => t.name === themeName) ?? themes[0]
+  const { highlightTheme, highlightThemeOverride, setHighlightTheme } = useHighlightTheme(currentTheme.highlight, isDark)
+  const { articleFont, setArticleFont } = useArticleFont()
+  const indicatorStyle = currentTheme.indicatorStyle ?? 'dot'
+  const { showThumbnails, setShowThumbnails } = useShowThumbnails()
+  const { showFeedActivity, setShowFeedActivity } = useShowFeedActivity()
+  const { chatPosition, setChatPosition } = useChatPosition()
+  const { layout, setLayout } = useLayout()
+  const { mascot, setMascot } = useMascot()
+  const [chatProvider, setChatProviderState] = useState<string | null>(null)
+  const [chatModel, setChatModelState] = useState<string | null>(null)
+  const [summaryProvider, setSummaryProviderState] = useState<string | null>(null)
+  const [summaryModel, setSummaryModelState] = useState<string | null>(null)
+  const [translateProvider, setTranslateProviderState] = useState<string | null>(null)
+  const [translateModel, setTranslateModelState] = useState<string | null>(null)
+
+  // --- DB sync ---
+  const { data: prefs } = useSWR<Prefs>(
+    '/api/settings/preferences',
+    fetcher,
+    { revalidateOnFocus: false, revalidateOnReconnect: false },
+  )
+
+  const dirtyKeysRef = useRef<Set<string>>(new Set())
+  const pendingRef = useRef<Partial<Prefs>>({})
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  // Stable refs for backfill values (only needed for keys that backfill to DB)
+  const themeNameRef = useRef(themeName)
+  themeNameRef.current = themeName
+  const dateModeRef = useRef(dateMode)
+  dateModeRef.current = dateMode
+  const autoMarkReadRef = useRef(autoMarkRead)
+  autoMarkReadRef.current = autoMarkRead
+  const showUnreadIndicatorRef = useRef(showUnreadIndicator)
+  showUnreadIndicatorRef.current = showUnreadIndicator
+  const internalLinksRef = useRef(internalLinks)
+  internalLinksRef.current = internalLinks
+  const showThumbnailsRef = useRef(showThumbnails)
+  showThumbnailsRef.current = showThumbnails
+  const showFeedActivityRef = useRef(showFeedActivity)
+  showFeedActivityRef.current = showFeedActivity
+  const chatPositionRef = useRef(chatPosition)
+  chatPositionRef.current = chatPosition
+  const layoutRef = useRef(layout)
+  layoutRef.current = layout
+  const mascotRef = useRef(mascot)
+  mascotRef.current = mascot
+
+  // DB → local hydration (data-driven)
+  useEffect(() => {
+    if (!prefs) return
+    const dirty = dirtyKeysRef.current
+    const backfill: Partial<Prefs> = {}
+
+    const hydrationMap: Array<{
+      key: keyof Prefs
+      setter: (v: any) => void
+      backfillRef?: React.MutableRefObject<string>
+      validate?: (v: string) => boolean
+    }> = [
+      { key: 'appearance.color_theme', setter: setTheme, backfillRef: themeNameRef },
+      { key: 'reading.date_mode', setter: setDateMode, backfillRef: dateModeRef,
+        validate: v => v === 'relative' || v === 'absolute' },
+      { key: 'reading.auto_mark_read', setter: setAutoMarkRead, backfillRef: autoMarkReadRef,
+        validate: v => v === 'on' || v === 'off' },
+      { key: 'reading.unread_indicator', setter: setShowUnreadIndicator, backfillRef: showUnreadIndicatorRef,
+        validate: v => v === 'on' || v === 'off' },
+      { key: 'reading.internal_links', setter: setInternalLinks, backfillRef: internalLinksRef,
+        validate: v => v === 'on' || v === 'off' },
+      { key: 'reading.show_thumbnails', setter: setShowThumbnails, backfillRef: showThumbnailsRef,
+        validate: v => v === 'on' || v === 'off' },
+      { key: 'reading.show_feed_activity', setter: setShowFeedActivity, backfillRef: showFeedActivityRef,
+        validate: v => v === 'on' || v === 'off' },
+      { key: 'reading.chat_position', setter: setChatPosition, backfillRef: chatPositionRef,
+        validate: v => v === 'fab' || v === 'inline' },
+      { key: 'appearance.list_layout', setter: setLayout, backfillRef: layoutRef,
+        validate: v => v === 'list' || v === 'card' || v === 'magazine' || v === 'compact' },
+      { key: 'appearance.mascot', setter: setMascot, backfillRef: mascotRef,
+        validate: v => v === 'off' || v === 'dream-puff' || v === 'sleepy-giant' },
+      { key: 'appearance.highlight_theme', setter: setHighlightTheme },
+      { key: 'appearance.font_family', setter: setArticleFont },
+      { key: 'chat.provider', setter: setChatProviderState },
+      { key: 'chat.model', setter: setChatModelState },
+      { key: 'summary.provider', setter: setSummaryProviderState },
+      { key: 'summary.model', setter: setSummaryModelState },
+      { key: 'translate.provider', setter: setTranslateProviderState },
+      { key: 'translate.model', setter: setTranslateModelState },
+    ]
+
+    for (const { key, setter, backfillRef, validate } of hydrationMap) {
+      if (dirty.has(key)) continue
+      const value = prefs[key]
+      if (value) {
+        if (!validate || validate(value)) setter(value)
+        else if (backfillRef) backfill[key] = backfillRef.current
+      } else if (backfillRef) {
+        backfill[key] = backfillRef.current
+      }
+    }
+
+    if (Object.keys(backfill).length > 0) {
+      apiPatch('/api/settings/preferences', backfill).catch((err) => console.warn('Failed to sync settings backfill:', err))
+    }
+  }, [prefs, setTheme, setDateMode, setAutoMarkRead, setShowUnreadIndicator, setInternalLinks, setShowThumbnails, setShowFeedActivity, setChatPosition, setLayout, setMascot, setHighlightTheme, setArticleFont])
+
+  // Flush pending changes immediately via fetch keepalive (survives page unload)
+  const flushNow = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = undefined
+    }
+    const patch = { ...pendingRef.current }
+    pendingRef.current = {}
+    if (Object.keys(patch).length > 0) {
+      fetch('/api/settings/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify(patch),
+        keepalive: true,
+      }).catch((err) => console.warn('Failed to flush settings:', err))
+    }
+  }, [])
+
+  // Debounced save: 500ms after last change
+  const scheduleSave = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => {
+      timerRef.current = undefined
+      const patch = { ...pendingRef.current }
+      pendingRef.current = {}
+      if (Object.keys(patch).length > 0) {
+        apiPatch('/api/settings/preferences', patch).catch((err) => console.warn('Failed to save settings:', err))
+      }
+    }, SETTINGS_SYNC_DEBOUNCE_MS)
+  }, [])
+
+  // Flush on beforeunload + unmount
+  useEffect(() => {
+    const onBeforeUnload = () => flushNow()
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload)
+      flushNow()
+    }
+  }, [flushNow])
+
+  // Stable ref for scheduleSave (avoids recreating factory setters when scheduleSave changes)
+  const scheduleSaveRef = useRef(scheduleSave)
+  scheduleSaveRef.current = scheduleSave
+
+  // Factory-generated synced setters (all useState setters are referentially stable)
+  const {
+    syncedSetDateMode,
+    syncedSetAutoMarkRead,
+    syncedSetShowUnreadIndicator,
+    syncedSetInternalLinks,
+    syncedSetShowThumbnails,
+    syncedSetShowFeedActivity,
+    syncedSetChatPosition,
+    syncedSetLayout,
+    syncedSetArticleFont,
+    syncedSetMascot,
+    syncedSetChatProvider,
+    syncedSetChatModel,
+    syncedSetSummaryProvider,
+    syncedSetSummaryModel,
+    syncedSetTranslateProvider,
+    syncedSetTranslateModel,
+  } = useMemo(() => {
+    const make = <T extends string>(key: keyof Prefs, setter: (v: T) => void) =>
+      (value: T) => {
+        dirtyKeysRef.current.add(key)
+        setter(value)
+        pendingRef.current[key] = value
+        scheduleSaveRef.current()
+      }
+    return {
+      syncedSetDateMode: make<'relative' | 'absolute'>('reading.date_mode', setDateMode),
+      syncedSetAutoMarkRead: make<'on' | 'off'>('reading.auto_mark_read', setAutoMarkRead),
+      syncedSetShowUnreadIndicator: make<'on' | 'off'>('reading.unread_indicator', setShowUnreadIndicator),
+      syncedSetInternalLinks: make<'on' | 'off'>('reading.internal_links', setInternalLinks),
+      syncedSetShowThumbnails: make<'on' | 'off'>('reading.show_thumbnails', setShowThumbnails),
+      syncedSetShowFeedActivity: make<'on' | 'off'>('reading.show_feed_activity', setShowFeedActivity),
+      syncedSetChatPosition: make<'fab' | 'inline'>('reading.chat_position', setChatPosition),
+      syncedSetLayout: make<LayoutName>('appearance.list_layout', setLayout),
+      syncedSetArticleFont: make<string>('appearance.font_family', setArticleFont),
+      syncedSetMascot: make<MascotChoice>('appearance.mascot', setMascot),
+      syncedSetChatProvider: make<string>('chat.provider', setChatProviderState),
+      syncedSetChatModel: make<string>('chat.model', setChatModelState),
+      syncedSetSummaryProvider: make<string>('summary.provider', setSummaryProviderState),
+      syncedSetSummaryModel: make<string>('summary.model', setSummaryModelState),
+      syncedSetTranslateProvider: make<string>('translate.provider', setTranslateProviderState),
+      syncedSetTranslateModel: make<string>('translate.model', setTranslateModelState),
+    }
+    // All setters are from useState (stable) or custom hooks with useCallback (stable)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setDateMode, setAutoMarkRead, setShowUnreadIndicator, setInternalLinks, setShowThumbnails, setShowFeedActivity, setChatPosition, setLayout, setArticleFont, setMascot])
+
+  // Special: theme setter updates 2 keys + resets highlight
+  const syncedSetTheme = useCallback((name: string) => {
+    dirtyKeysRef.current.add('appearance.color_theme')
+    dirtyKeysRef.current.add('appearance.highlight_theme')
+    setTheme(name)
+    setHighlightTheme(null) // reset to auto on app theme change
+    pendingRef.current['appearance.color_theme'] = name
+    pendingRef.current['appearance.highlight_theme'] = '' // empty string = delete from DB
+    scheduleSave()
+  }, [setTheme, setHighlightTheme, scheduleSave])
+
+  // Special: highlight setter converts null → '' for DB
+  const syncedSetHighlightTheme = useCallback((value: string | null) => {
+    dirtyKeysRef.current.add('appearance.highlight_theme')
+    setHighlightTheme(value)
+    pendingRef.current['appearance.highlight_theme'] = value || '' // empty string = delete from DB (auto)
+    scheduleSave()
+  }, [setHighlightTheme, scheduleSave])
+
+  return {
+    isDark,
+    colorMode,
+    setColorMode,
+    themeName,
+    setTheme: syncedSetTheme,
+    themes,
+    dateMode,
+    setDateMode: syncedSetDateMode,
+    autoMarkRead,
+    setAutoMarkRead: syncedSetAutoMarkRead,
+    showUnreadIndicator,
+    setShowUnreadIndicator: syncedSetShowUnreadIndicator,
+    internalLinks,
+    setInternalLinks: syncedSetInternalLinks,
+    showThumbnails,
+    setShowThumbnails: syncedSetShowThumbnails,
+    showFeedActivity,
+    setShowFeedActivity: syncedSetShowFeedActivity,
+    chatPosition,
+    setChatPosition: syncedSetChatPosition,
+    layout,
+    setLayout: syncedSetLayout,
+    highlightTheme,
+    highlightThemeOverride,
+    setHighlightTheme: syncedSetHighlightTheme,
+    articleFont,
+    setArticleFont: syncedSetArticleFont,
+    mascot,
+    setMascot: syncedSetMascot,
+    indicatorStyle,
+    chatProvider,
+    setChatProvider: syncedSetChatProvider,
+    chatModel,
+    setChatModel: syncedSetChatModel,
+    summaryProvider,
+    setSummaryProvider: syncedSetSummaryProvider,
+    summaryModel,
+    setSummaryModel: syncedSetSummaryModel,
+    translateProvider,
+    setTranslateProvider: syncedSetTranslateProvider,
+    translateModel,
+    setTranslateModel: syncedSetTranslateModel,
+  }
+}
+
+export type Settings = ReturnType<typeof useSettings>
