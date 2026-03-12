@@ -362,6 +362,17 @@ const dict = {
   'settings.sampleButton': { ja: 'サンプル', en: 'Sample' },
   'settings.themeLimit': { ja: 'カスタムテーマは最大20個までです', en: 'Maximum 20 custom themes allowed' },
 
+  // Theme JSON validation errors
+  'themeJson.invalidJson': { ja: '無効なJSON: オブジェクトが必要です', en: 'Invalid JSON: expected an object' },
+  'themeJson.missingName': { ja: '必須フィールド "name" がありません', en: 'Missing required field: "name"' },
+  'themeJson.invalidName': { ja: '"name" は小文字英数字・ハイフン・アンダースコアのみ使用可能です（入力値: "${name}"）', en: '"name" must be lowercase alphanumeric, hyphens, or underscores (got "${name}")' },
+  'themeJson.builtinConflict': { ja: '"${name}" はビルトインテーマ名と競合しています', en: '"${name}" conflicts with a built-in theme name' },
+  'themeJson.duplicateName': { ja: '"${name}" という名前のカスタムテーマは既に存在します', en: 'A custom theme named "${name}" already exists' },
+  'themeJson.missingLabel': { ja: '必須フィールド "label" がありません', en: 'Missing required field: "label"' },
+  'themeJson.missingColors': { ja: '必須フィールド "colors" がありません', en: 'Missing required field: "colors"' },
+  'themeJson.missingColorsVariant': { ja: '"colors.${variant}" は必須です', en: '"colors.${variant}" is required' },
+  'themeJson.missingColor': { ja: '必須カラー "${path}" がありません', en: 'Missing required color "${path}"' },
+
   // Mascot
   'settings.mascot': { ja: 'マスコット', en: 'Mascot' },
   'settings.mascotDesc': { ja: '記事を全て読み終えたときに表示されるピクセルアートのマスコットです', en: 'Pixel art mascot shown when all articles are read' },

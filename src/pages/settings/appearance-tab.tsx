@@ -59,10 +59,10 @@ export function AppearanceTab() {
     reader.onload = () => {
       if (typeof reader.result !== 'string') return
       let parsed: unknown
-      try { parsed = JSON.parse(reader.result) } catch { toast.error('Invalid JSON'); return }
+      try { parsed = JSON.parse(reader.result) } catch { toast.error(t('themeJson.invalidJson')); return }
       const existingNames = new Set(customThemes.map(ct => ct.name))
       const result = parseThemeJson(parsed, existingNames)
-      if ('error' in result) { toast.error(result.error); return }
+      if ('error' in result) { toast.error(t(result.error.key as Parameters<typeof t>[0], result.error.params)); return }
       if (customThemes.length >= 20) { toast.error(t('settings.themeLimit')); return }
       setCustomThemes(prev => [...prev, result.theme])
       setTheme(result.theme.name)
@@ -642,14 +642,14 @@ function ThemeJsonDialog({
       return
     }
     let parsed: unknown
-    try { parsed = JSON.parse(jsonText) } catch { setError('Invalid JSON'); return }
+    try { parsed = JSON.parse(jsonText) } catch { setError(t('themeJson.invalidJson')); return }
     const existingNames = new Set(
       customThemes
         .filter(ct => !isEditing || ct.name !== editingTheme?.name)
         .map(ct => ct.name),
     )
     const result = parseThemeJson(parsed, existingNames)
-    if ('error' in result) { setError(result.error); return }
+    if ('error' in result) { setError(t(result.error.key as Parameters<typeof t>[0], result.error.params)); return }
     if (isEditing) {
       setCustomThemes(prev => prev.map(ct => ct.name === editingTheme?.name ? result.theme : ct))
       toast.success(t('settings.themeUpdated'))

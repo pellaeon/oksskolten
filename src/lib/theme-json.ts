@@ -31,49 +31,51 @@ const BUILTIN_NAMES = new Set(builtinThemes.map(t => t.name))
 
 const NAME_RE = /^[a-z0-9_-]+$/
 
+export type ThemeJsonError = { key: string; params?: Record<string, string> }
+
 /** Validate and convert user-facing JSON into an internal Theme object. */
 export function parseThemeJson(
   json: unknown,
   existingCustomNames: Set<string>,
-): { theme: Theme } | { error: string } {
+): { theme: Theme } | { error: ThemeJsonError } {
   if (!json || typeof json !== 'object') {
-    return { error: 'Invalid JSON: expected an object' }
+    return { error: { key: 'themeJson.invalidJson' } }
   }
 
   const obj = json as Record<string, unknown>
 
   // name
   if (typeof obj.name !== 'string' || !obj.name) {
-    return { error: 'Missing required field: "name"' }
+    return { error: { key: 'themeJson.missingName' } }
   }
   const name = obj.name.trim()
   if (!NAME_RE.test(name)) {
-    return { error: `"name" must be lowercase alphanumeric, hyphens, or underscores (got "${name}")` }
+    return { error: { key: 'themeJson.invalidName', params: { name } } }
   }
   if (BUILTIN_NAMES.has(name)) {
-    return { error: `"${name}" conflicts with a built-in theme name` }
+    return { error: { key: 'themeJson.builtinConflict', params: { name } } }
   }
   if (existingCustomNames.has(name)) {
-    return { error: `A custom theme named "${name}" already exists` }
+    return { error: { key: 'themeJson.duplicateName', params: { name } } }
   }
 
   // label
   if (typeof obj.label !== 'string' || !obj.label) {
-    return { error: 'Missing required field: "label"' }
+    return { error: { key: 'themeJson.missingLabel' } }
   }
   const label = obj.label.trim().slice(0, 50)
 
   // colors
   if (!obj.colors || typeof obj.colors !== 'object') {
-    return { error: 'Missing required field: "colors"' }
+    return { error: { key: 'themeJson.missingColors' } }
   }
   const colorsObj = obj.colors as Record<string, unknown>
 
   if (!colorsObj.light || typeof colorsObj.light !== 'object') {
-    return { error: '"colors.light" is required' }
+    return { error: { key: 'themeJson.missingColorsVariant', params: { variant: 'light' } } }
   }
   if (!colorsObj.dark || typeof colorsObj.dark !== 'object') {
-    return { error: '"colors.dark" is required' }
+    return { error: { key: 'themeJson.missingColorsVariant', params: { variant: 'dark' } } }
   }
 
   const lightResult = convertColorMap(colorsObj.light as Record<string, unknown>, 'light')
@@ -102,13 +104,13 @@ export function parseThemeJson(
 function convertColorMap(
   input: Record<string, unknown>,
   variant: 'light' | 'dark',
-): { colors: Record<string, string> } | { error: string } {
+): { colors: Record<string, string> } | { error: ThemeJsonError } {
   const result: Record<string, string> = {}
 
   // Check required keys
   for (const key of REQUIRED_KEYS) {
     if (typeof input[key] !== 'string' || !input[key]) {
-      return { error: `Missing required color "colors.${variant}.${key}"` }
+      return { error: { key: 'themeJson.missingColor', params: { path: `colors.${variant}.${key}` } } }
     }
   }
 
