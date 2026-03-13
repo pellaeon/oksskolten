@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Construction, ExternalLink } from 'lucide-react'
 import useSWR from 'swr'
@@ -7,7 +8,7 @@ import { PasskeySettings } from '../components/settings/passkey-settings'
 import { GitHubOAuthSettings } from '../components/settings/github-oauth-settings'
 import { ImageStorageSettings } from '../components/settings/image-storage-settings'
 import { GeneralTab } from './settings/general-tab'
-import { AppearanceTab } from './settings/appearance-tab'
+const AppearanceTab = lazy(() => import('./settings/appearance-tab').then(m => ({ default: m.AppearanceTab })))
 import { IntegrationTab } from './settings/integration-tab'
 import { DataTab } from './settings/data-tab'
 import { Separator } from '@/components/ui/separator'
@@ -81,7 +82,9 @@ export function SettingsPage() {
           )}
 
           {tab === 'appearance' && (
-            <AppearanceTab />
+            <Suspense>
+              <AppearanceTab />
+            </Suspense>
           )}
 
           {tab === 'integration' && (
