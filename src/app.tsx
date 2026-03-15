@@ -74,7 +74,24 @@ function AppLayout() {
           <FetchProgressProvider>
             <Outlet context={{ settings, sidebarOpen, setSidebarOpen }} />
           </FetchProgressProvider>
-          <Toaster theme="system" duration={5000} position="top-right" richColors />
+          <Toaster
+            theme="system"
+            duration={5000}
+            position="top-right"
+            richColors
+            offset={{
+              top: 'calc(var(--safe-area-inset-top) + 24px)',
+              right: '24px',
+              bottom: 'calc(var(--safe-area-inset-bottom) + 24px)',
+              left: '24px',
+            }}
+            mobileOffset={{
+              top: 'calc(var(--safe-area-inset-top) + 16px)',
+              right: '16px',
+              bottom: 'calc(var(--safe-area-inset-bottom) + 16px)',
+              left: '16px',
+            }}
+          />
         </div>
       </TooltipProvider>
     </LocaleContext.Provider>

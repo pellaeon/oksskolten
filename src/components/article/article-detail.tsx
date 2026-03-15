@@ -183,7 +183,9 @@ export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
     <>
     <article ref={articleRef} className="article-card max-w-2xl mx-auto px-6 md:px-10 py-8">
       {/* Title */}
-      <h1 className="text-[28px] font-bold leading-[1.3] mb-1.5">{article.title}</h1>
+      <h1 className="mb-1.5 text-[28px] font-bold leading-[1.3] break-words [overflow-wrap:anywhere]">
+        {article.title}
+      </h1>
 
       {/* Date */}
       <p className="text-sm text-muted mb-3">{formatDetailDate(article.published_at, locale)}</p>
