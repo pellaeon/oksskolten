@@ -417,7 +417,7 @@ export function getRetryArticles(
   batchLimit = RETRY_BATCH_LIMIT,
 ): Article[] {
   return getDb().prepare(`
-    SELECT * FROM articles
+    SELECT * FROM active_articles
     WHERE last_error IS NOT NULL
       AND full_text IS NULL
       AND retry_count < :max_attempts
@@ -448,7 +448,7 @@ export function getRetryStats(maxAttempts = RETRY_MAX_ATTEMPTS): RetryStats {
         ${BACKOFF_DEADLINE} > datetime('now')
       THEN 1 ELSE 0 END) AS backoff_waiting,
       SUM(CASE WHEN retry_count >= :max_attempts THEN 1 ELSE 0 END) AS exceeded
-    FROM articles
+    FROM active_articles
     WHERE last_error IS NOT NULL AND full_text IS NULL
   `).get({ max_attempts: maxAttempts }) as { eligible: number | null; backoff_waiting: number | null; exceeded: number | null }
   return {
