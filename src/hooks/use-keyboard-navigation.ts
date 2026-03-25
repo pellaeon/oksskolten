@@ -7,7 +7,7 @@ export interface KeyBindings {
   openExternal: string
 }
 
-const DEFAULT_KEY_BINDINGS: KeyBindings = {
+export const DEFAULT_KEY_BINDINGS: KeyBindings = {
   next: 'j',
   prev: 'k',
   bookmark: 'b',

@@ -1,16 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useKeybindingsSetting } from './use-keybindings-setting'
-import type { KeyBindings } from './use-keyboard-navigation'
+import { DEFAULT_KEY_BINDINGS, type KeyBindings } from './use-keyboard-navigation'
 
 const STORAGE_KEY = 'keybindings'
-
-const DEFAULT_KEYBINDINGS: KeyBindings = {
-  next: 'j',
-  prev: 'k',
-  bookmark: 'b',
-  openExternal: ';',
-}
 
 describe('useKeybindingsSetting', () => {
   beforeEach(() => {
@@ -19,7 +12,7 @@ describe('useKeybindingsSetting', () => {
 
   it('returns default keybindings when localStorage is empty', () => {
     const { result } = renderHook(() => useKeybindingsSetting())
-    expect(result.current.keybindings).toEqual(DEFAULT_KEYBINDINGS)
+    expect(result.current.keybindings).toEqual(DEFAULT_KEY_BINDINGS)
   })
 
   it('returns stored keybindings from localStorage', () => {
@@ -46,13 +39,13 @@ describe('useKeybindingsSetting', () => {
     localStorage.setItem(STORAGE_KEY, 'not-json')
 
     const { result } = renderHook(() => useKeybindingsSetting())
-    expect(result.current.keybindings).toEqual(DEFAULT_KEYBINDINGS)
+    expect(result.current.keybindings).toEqual(DEFAULT_KEY_BINDINGS)
   })
 
   it('falls back to defaults when localStorage contains incomplete data', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ next: 'n' }))
 
     const { result } = renderHook(() => useKeybindingsSetting())
-    expect(result.current.keybindings).toEqual(DEFAULT_KEYBINDINGS)
+    expect(result.current.keybindings).toEqual(DEFAULT_KEY_BINDINGS)
   })
 })

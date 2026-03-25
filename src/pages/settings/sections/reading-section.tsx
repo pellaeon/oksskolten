@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useI18n, type TranslateFn } from '../../../lib/i18n'
 import { PreviewCard } from '../../../components/settings/preview-card'
 import { useAppLayout } from '../../../app'
@@ -418,6 +418,8 @@ function KeybindingsEditor({
 }) {
   const [draft, setDraft] = useState<KeyBindings>(keybindings)
 
+  useEffect(() => { setDraft(keybindings) }, [keybindings])
+
   const actions: Array<{ key: keyof KeyBindings; label: string }> = [
     { key: 'next', label: t('settings.keybindingsNext') },
     { key: 'prev', label: t('settings.keybindingsPrev') },
@@ -428,11 +430,13 @@ function KeybindingsEditor({
   const values = Object.values(draft)
   const hasDuplicate = new Set(values).size !== values.length
 
+  const PRINTABLE_RE = /^[!-~]$/
+
   const handleChange = (action: keyof KeyBindings, value: string) => {
     const next = { ...draft, [action]: value }
     setDraft(next)
     const nextValues = Object.values(next)
-    if (new Set(nextValues).size === nextValues.length && nextValues.every(v => v.length === 1)) {
+    if (new Set(nextValues).size === nextValues.length && nextValues.every(v => PRINTABLE_RE.test(v))) {
       setKeybindings(next)
     }
   }
@@ -450,6 +454,9 @@ function KeybindingsEditor({
               maxLength={1}
               value={draft[key]}
               onChange={(e) => handleChange(key, e.target.value)}
+              onBlur={() => {
+                if (!draft[key]) setDraft(prev => ({ ...prev, [key]: keybindings[key] }))
+              }}
               className="w-10 h-8 text-center text-sm border border-border rounded bg-bg-card text-text focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </div>

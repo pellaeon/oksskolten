@@ -196,9 +196,10 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
             reply.status(400).send({ error: 'Invalid keybindings: keys must be next, prev, bookmark, openExternal' })
             return
           }
+          const PRINTABLE_RE = /^[!-~]$/
           const vals = Object.values(parsed) as string[]
-          if (!vals.every(v => typeof v === 'string' && v.length === 1)) {
-            reply.status(400).send({ error: 'Invalid keybindings: values must be single characters' })
+          if (!vals.every(v => typeof v === 'string' && PRINTABLE_RE.test(v))) {
+            reply.status(400).send({ error: 'Invalid keybindings: values must be single printable ASCII characters' })
             return
           }
           if (new Set(vals).size !== vals.length) {

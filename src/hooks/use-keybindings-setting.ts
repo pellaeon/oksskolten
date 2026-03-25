@@ -1,34 +1,29 @@
 import { useState, useEffect } from 'react'
-import type { KeyBindings } from './use-keyboard-navigation'
+import { DEFAULT_KEY_BINDINGS, type KeyBindings } from './use-keyboard-navigation'
 
 const STORAGE_KEY = 'keybindings'
 
-const DEFAULT_KEYBINDINGS: KeyBindings = {
-  next: 'j',
-  prev: 'k',
-  bookmark: 'b',
-  openExternal: ';',
-}
+const PRINTABLE_RE = /^[!-~]$/
 
 function isValidKeybindings(value: unknown): value is KeyBindings {
   if (typeof value !== 'object' || value === null) return false
   const obj = value as Record<string, unknown>
   return (
-    typeof obj.next === 'string' && obj.next.length === 1 &&
-    typeof obj.prev === 'string' && obj.prev.length === 1 &&
-    typeof obj.bookmark === 'string' && obj.bookmark.length === 1 &&
-    typeof obj.openExternal === 'string' && obj.openExternal.length === 1
+    typeof obj.next === 'string' && PRINTABLE_RE.test(obj.next) &&
+    typeof obj.prev === 'string' && PRINTABLE_RE.test(obj.prev) &&
+    typeof obj.bookmark === 'string' && PRINTABLE_RE.test(obj.bookmark) &&
+    typeof obj.openExternal === 'string' && PRINTABLE_RE.test(obj.openExternal)
   )
 }
 
 function getStored(): KeyBindings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return DEFAULT_KEYBINDINGS
+    if (!raw) return DEFAULT_KEY_BINDINGS
     const parsed = JSON.parse(raw)
-    return isValidKeybindings(parsed) ? parsed : DEFAULT_KEYBINDINGS
+    return isValidKeybindings(parsed) ? parsed : DEFAULT_KEY_BINDINGS
   } catch {
-    return DEFAULT_KEYBINDINGS
+    return DEFAULT_KEY_BINDINGS
   }
 }
 
@@ -41,5 +36,3 @@ export function useKeybindingsSetting() {
 
   return { keybindings, setKeybindings: setKeybindingsState }
 }
-
-export { DEFAULT_KEYBINDINGS }
