@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         id: filter
         with:
           filters: |
@@ -104,7 +104,7 @@ jobs:
 
       - name: Download base coverage
         if: github.event_name == 'pull_request'
-        uses: dawidd6/action-download-artifact@v16
+        uses: dawidd6/action-download-artifact@8a338493df3d275e4a7a63bcff3b8fe97e51a927 # v19
         with:
           name: server-coverage
           path: coverage/server-base
@@ -124,7 +124,7 @@ jobs:
 
       - name: Coverage Report
         if: always() && github.event_name == 'pull_request'
-        uses: davelosert/vitest-coverage-report-action@v2
+        uses: davelosert/vitest-coverage-report-action@2500dafcee7dd64f85ab689c0b83798a8359770e # v2.9.3
         with:
           name: Server Coverage
           json-summary-path: coverage/server/coverage-summary.json
@@ -161,7 +161,7 @@ jobs:
 
       - name: Download base coverage
         if: github.event_name == 'pull_request'
-        uses: dawidd6/action-download-artifact@v16
+        uses: dawidd6/action-download-artifact@8a338493df3d275e4a7a63bcff3b8fe97e51a927 # v19
         with:
           name: client-coverage
           path: coverage/client-base
@@ -181,7 +181,7 @@ jobs:
 
       - name: Coverage Report
         if: always() && github.event_name == 'pull_request'
-        uses: davelosert/vitest-coverage-report-action@v2
+        uses: davelosert/vitest-coverage-report-action@2500dafcee7dd64f85ab689c0b83798a8359770e # v2.9.3
         with:
           name: Client Coverage
           json-summary-path: coverage/client/coverage-summary.json
