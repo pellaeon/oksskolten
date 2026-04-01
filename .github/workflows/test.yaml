@@ -203,8 +203,10 @@ jobs:
 
       - name: Install conftest
         run: |
-          curl -fsSL https://github.com/open-policy-agent/conftest/releases/download/v0.65.0/conftest_0.65.0_Linux_x86_64.tar.gz \
-            | tar xz -C /usr/local/bin conftest
+          curl -fsSL -o /tmp/conftest.tar.gz https://github.com/open-policy-agent/conftest/releases/download/v0.65.0/conftest_0.65.0_Linux_x86_64.tar.gz
+          echo "67f54077f51405558420e26b227a641c62c010fbc3bd168bca3a450a2541d32c  /tmp/conftest.tar.gz" | sha256sum -c -
+          tar xz -C /usr/local/bin conftest -f /tmp/conftest.tar.gz
+          rm /tmp/conftest.tar.gz
 
       - run: npm ci
 
@@ -225,10 +227,15 @@ jobs:
     steps:
       - name: Check results
         run: |
-          results=("${{ needs.check.result }}" "${{ needs.server-test.result }}" "${{ needs.client-test.result }}" "${{ needs.lint-docs.result }}")
+          results=("${CHECK_RESULT}" "${SERVER_TEST_RESULT}" "${CLIENT_TEST_RESULT}" "${LINT_DOCS_RESULT}")
           for r in "${results[@]}"; do
             if [[ "$r" != "success" && "$r" != "skipped" ]]; then
               echo "Job failed with result: $r"
               exit 1
             fi
           done
+        env:
+          CHECK_RESULT: ${{ needs.check.result }}
+          SERVER_TEST_RESULT: ${{ needs.server-test.result }}
+          CLIENT_TEST_RESULT: ${{ needs.client-test.result }}
+          LINT_DOCS_RESULT: ${{ needs.lint-docs.result }}
