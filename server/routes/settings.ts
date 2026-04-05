@@ -15,6 +15,7 @@ import { extractByDotPath } from '../fetcher/article-images.js'
 import { getMonthlyUsage } from '../providers/translate/google-translate.js'
 import { getDeeplMonthlyUsage } from '../providers/translate/deepl.js'
 import { parseOrBadRequest } from '../lib/validation.js'
+import { FULL_TEXT_BLACKLIST_SETTING_KEY } from '../../shared/full-text-fetch.js'
 
 const ProfileBody = z.object({
   account_name: z.string().optional(),
@@ -38,6 +39,7 @@ const PREF_KEYS = [
   'reading.category_unread_only',
   'reading.keyboard_navigation',
   'reading.keybindings',
+  'reading.full_text_blacklist',
   'appearance.mascot',
   'appearance.highlight_theme',
   'appearance.font_family',
@@ -71,6 +73,7 @@ const PREF_ALLOWED: Record<PrefKey, string[] | null> = {
   'reading.category_unread_only': ['on', 'off'],
   'reading.keyboard_navigation': ['on', 'off'],
   'reading.keybindings': null,
+  'reading.full_text_blacklist': null,
   'appearance.mascot': ['off', 'dream-puff', 'sleepy-giant'],
   'appearance.highlight_theme': null,
   'appearance.font_family': null,
@@ -181,7 +184,7 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
     for (const key of PREF_KEYS) {
       if (body[key] === undefined) continue
       const value = String(body[key])
-      if (value === '') {
+      if (value === '' && key !== FULL_TEXT_BLACKLIST_SETTING_KEY) {
         deleteSetting(key)
         updated = true
         continue
