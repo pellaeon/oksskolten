@@ -33,6 +33,11 @@ import type { AiTextResult } from '../fetcher.js'
 import { archiveArticleImages, isImageArchivingEnabled, deleteArticleImages } from '../fetcher/article-images.js'
 import { getSetting } from '../db/settings.js'
 import { DEFAULT_LANGUAGE } from '../../shared/lang.js'
+import {
+  logFreshRssSyncError,
+  syncFreshRssReadStateByLocalArticleId,
+  syncFreshRssSavedStateByLocalArticleId,
+} from '../freshrss/sync.js'
 import path from 'node:path'
 import fs from 'node:fs'
 import { dataPath } from '../paths.js'
@@ -386,6 +391,8 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
         reply.status(404).send({ error: 'Article not found' })
         return
       }
+      void syncFreshRssReadStateByLocalArticleId(params.id, body.seen)
+        .catch(error => logFreshRssSyncError('article read-state push', error))
       reply.send(result)
     },
   )
@@ -403,6 +410,8 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
         reply.status(404).send({ error: 'Article not found' })
         return
       }
+      void syncFreshRssSavedStateByLocalArticleId(params.id)
+        .catch(error => logFreshRssSyncError('article saved-state push', error))
       reply.send(result)
     },
   )
@@ -420,6 +429,8 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
         reply.status(404).send({ error: 'Article not found' })
         return
       }
+      void syncFreshRssSavedStateByLocalArticleId(params.id)
+        .catch(error => logFreshRssSyncError('article saved-state push', error))
       reply.send(result)
     },
   )
@@ -431,6 +442,10 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
       const body = parseOrBadRequest(BatchSeenBody, request.body, reply)
       if (!body) return
       const result = markArticlesSeen(body.ids)
+      for (const articleId of body.ids) {
+        void syncFreshRssReadStateByLocalArticleId(articleId, true)
+          .catch(error => logFreshRssSyncError('batch article read-state push', error))
+      }
       reply.send(result)
     },
   )
@@ -445,6 +460,8 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
         reply.status(404).send({ error: 'Article not found' })
         return
       }
+      void syncFreshRssReadStateByLocalArticleId(params.id, true)
+        .catch(error => logFreshRssSyncError('article read-state push', error))
       reply.send(result)
     },
   )

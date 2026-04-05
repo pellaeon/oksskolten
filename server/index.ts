@@ -19,6 +19,7 @@ import { passkeyRoutes } from './passkeyRoutes.js'
 import { oauthRoutes } from './oauthRoutes.js'
 import { fetchAllFeeds } from './fetcher.js'
 import { rebuildSearchIndex, isSearchReady, syncAllScoredArticlesToSearch } from './search/sync.js'
+import { logFreshRssSyncError, syncFreshRssFeedsIfEnabled } from './freshrss/sync.js'
 
 // --- Startup guards ---
 if (process.env.AUTH_DISABLED === '1' && process.env.NODE_ENV !== 'development') {
@@ -171,6 +172,15 @@ cronTasks.push(cron.schedule(CRON_SCHEDULE, async () => {
   activeFetchPromise = null
 }))
 
+const FRESHRSS_SYNC_SCHEDULE = process.env.FRESHRSS_SYNC_SCHEDULE || '*/15 * * * *'
+cronTasks.push(cron.schedule(FRESHRSS_SYNC_SCHEDULE, async () => {
+  try {
+    await syncFreshRssFeedsIfEnabled()
+  } catch (error) {
+    logFreshRssSyncError('feed sync cron', error)
+  }
+}))
+
 // --- Score recalculation ---
 // Decoupled from feed fetch so the schedule can be tuned independently.
 // Default matches the original 5-minute interval; set SCORE_RECALC_SCHEDULE
@@ -215,6 +225,10 @@ cronTasks.push(cron.schedule('0 */6 * * *', async () => {
     log.error('[cron] Search index rebuild error:', err)
   }
 }))
+
+void syncFreshRssFeedsIfEnabled().catch(error => {
+  logFreshRssSyncError('startup sync', error)
+})
 
 // --- Retention policy ---
 // Daily cleanup of old articles based on user-configured retention settings.

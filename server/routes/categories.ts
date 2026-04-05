@@ -9,6 +9,7 @@ import {
 } from '../db.js'
 import { requireJson } from '../auth.js'
 import { NumericIdParams, parseOrBadRequest } from '../lib/validation.js'
+import { logFreshRssSyncError, syncFreshRssGroupReadStateByLocalCategoryId } from '../freshrss/sync.js'
 
 const CreateCategoryBody = z.object({
   name: z.string({ error: 'name is required' }).trim().min(1, 'name is required'),
@@ -74,6 +75,8 @@ export async function categoryRoutes(api: FastifyInstance): Promise<void> {
       const params = parseOrBadRequest(NumericIdParams, request.params, reply)
       if (!params) return
       const result = markAllSeenByCategory(params.id)
+      void syncFreshRssGroupReadStateByLocalCategoryId(params.id)
+        .catch(error => logFreshRssSyncError('category read-state push', error))
       reply.send(result)
     },
   )

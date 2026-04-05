@@ -26,6 +26,7 @@ import { fetchSingleFeed, discoverRssUrl } from '../fetcher.js'
 import { queryRssBridge, inferCssSelectorBridge } from '../rss-bridge.js'
 import { parseOpml, generateOpml } from '../opml.js'
 import { NumericIdParams, parseOrBadRequest } from '../lib/validation.js'
+import { logFreshRssSyncError, syncFreshRssFeedReadStateByLocalFeedId } from '../freshrss/sync.js'
 
 const httpsUrl = z
   .string({ error: 'url is required' })
@@ -326,6 +327,8 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
       const params = parseOrBadRequest(NumericIdParams, request.params, reply)
       if (!params) return
       const result = markAllSeenByFeed(params.id)
+      void syncFreshRssFeedReadStateByLocalFeedId(params.id)
+        .catch(error => logFreshRssSyncError('feed read-state push', error))
       reply.send(result)
     },
   )
