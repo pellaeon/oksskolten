@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setupTestDb } from './__tests__/helpers/testDb.js'
 import { createFeed, insertArticle, getArticleByUrl, getFeedById, upsertSetting } from './db.js'
 import type { Feed } from './db.js'
@@ -2108,6 +2108,84 @@ describe('FlareSolverr — fetchFullText', () => {
 
     await expect(fetchFullText('https://cf-blog.example.com/post-1'))
       .rejects.toThrow('HTTP 403')
+  })
+})
+
+describe('fetchArticleContent — hostname rate limit', () => {
+  let fetchArticleContent: typeof import('./fetcher.js').fetchArticleContent
+  let configureLimiter: typeof import('./fetcher/hostname-rate-limit.js').configureFullTextHostnameRateLimiterForTests
+  let resetLimiter: typeof import('./fetcher/hostname-rate-limit.js').resetFullTextHostnameRateLimiterForTests
+
+  beforeEach(async () => {
+    const fetcherMod = await import('./fetcher.js')
+    const limiterMod = await import('./fetcher/hostname-rate-limit.js')
+    fetchArticleContent = fetcherMod.fetchArticleContent
+    configureLimiter = limiterMod.configureFullTextHostnameRateLimiterForTests
+    resetLimiter = limiterMod.resetFullTextHostnameRateLimiterForTests
+  })
+
+  afterEach(() => {
+    resetLimiter()
+  })
+
+  it('waits one minute between full-text fetches to the same hostname', async () => {
+    let nowMs = 1_000
+    const waits: number[] = []
+    const fetchTimes: number[] = []
+
+    configureLimiter({
+      intervalMs: 60_000,
+      now: () => nowMs,
+      sleep: async (ms) => {
+        waits.push(ms)
+        nowMs += ms
+      },
+    })
+
+    mockFetch.mockImplementation((url: string | URL) => {
+      fetchTimes.push(nowMs)
+      return Promise.resolve(mockResponse(articleHtml({ title: url.toString() })))
+    })
+
+    await Promise.all([
+      fetchArticleContent('https://same-host.example.com/post-1'),
+      fetchArticleContent('https://same-host.example.com/post-2'),
+    ])
+
+    expect(waits).toEqual([60_000])
+    expect(fetchTimes).toEqual([1_000, 61_000])
+  })
+
+  it('does not delay full-text fetches across different hostnames', async () => {
+    let nowMs = 2_000
+    const waits: number[] = []
+    const fetchTimes = new Map<string, number[]>()
+
+    configureLimiter({
+      intervalMs: 60_000,
+      now: () => nowMs,
+      sleep: async (ms) => {
+        waits.push(ms)
+        nowMs += ms
+      },
+    })
+
+    mockFetch.mockImplementation((url: string | URL) => {
+      const hostname = new URL(url.toString()).hostname
+      const times = fetchTimes.get(hostname) ?? []
+      times.push(nowMs)
+      fetchTimes.set(hostname, times)
+      return Promise.resolve(mockResponse(articleHtml({ title: url.toString() })))
+    })
+
+    await Promise.all([
+      fetchArticleContent('https://alpha.example.com/post-1'),
+      fetchArticleContent('https://beta.example.com/post-1'),
+    ])
+
+    expect(waits).toEqual([])
+    expect(fetchTimes.get('alpha.example.com')).toEqual([2_000])
+    expect(fetchTimes.get('beta.example.com')).toEqual([2_000])
   })
 })
 
