@@ -40,6 +40,10 @@ export function getFeedByUrl(url: string): Feed | undefined {
   return getDb().prepare('SELECT * FROM feeds WHERE url = ?').get(url) as Feed | undefined
 }
 
+export function getFeedByRssUrl(rssUrl: string): Feed | undefined {
+  return getDb().prepare('SELECT * FROM feeds WHERE rss_url = ?').get(rssUrl) as Feed | undefined
+}
+
 export function getEnabledFeeds(): Feed[] {
   return getDb().prepare(
     "SELECT * FROM feeds WHERE disabled = 0 AND type = 'rss' AND (next_check_at IS NULL OR next_check_at <= strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))",
@@ -86,7 +90,7 @@ export function createFeed(data: {
 
 export function updateFeed(
   id: number,
-  data: { name?: string; rss_url?: string | null; rss_bridge_url?: string | null; disabled?: number; category_id?: number | null; requires_js_challenge?: number },
+  data: { name?: string; url?: string; rss_url?: string | null; rss_bridge_url?: string | null; disabled?: number; category_id?: number | null; requires_js_challenge?: number },
 ): Feed | undefined {
   const feed = getFeedById(id)
   if (!feed) return undefined
@@ -97,6 +101,10 @@ export function updateFeed(
   if (data.name !== undefined) {
     fields.push('name = @name')
     params.name = data.name
+  }
+  if (data.url !== undefined) {
+    fields.push('url = @url')
+    params.url = data.url
   }
   if (data.rss_url !== undefined) {
     fields.push('rss_url = @rss_url')

@@ -1,6 +1,6 @@
 export { getDb, _resetDb, runMigrations, bindNamedParams, runNamed, getNamed, allNamed } from './connection.js'
 export type { Category, Feed, FeedWithCounts, Article, ArticleListItem, ArticleDetail, Conversation, ChatMessage } from './types.js'
-export { getFeeds, getFeedById, getFeedByUrl, getEnabledFeeds, ensureClipFeed, getClipFeed, createFeed, updateFeed, deleteFeed, bulkMoveFeedsToCategory, updateFeedError, updateFeedRateLimit, updateFeedRssUrl, updateFeedCacheHeaders, updateFeedSchedule, getFeedMetrics } from './feeds.js'
+export { getFeeds, getFeedById, getFeedByUrl, getFeedByRssUrl, getEnabledFeeds, ensureClipFeed, getClipFeed, createFeed, updateFeed, deleteFeed, bulkMoveFeedsToCategory, updateFeedError, updateFeedRateLimit, updateFeedRssUrl, updateFeedCacheHeaders, updateFeedSchedule, getFeedMetrics } from './feeds.js'
 export { getArticles, getArticleByUrl, getArticleById, getArticlesByIds, markArticleSeen, markArticlesSeen, markAllSeenByFeed, markArticleBookmarked, getBookmarkCount, markArticleLiked, getLikeCount, recordArticleRead, insertArticle, updateArticleContent, getExistingArticleUrls, getRetryArticles, getRetryStats, searchArticles, getReadingStats, markImagesArchived, clearImagesArchived, deleteArticle, updateScore, recalculateScores, getRetentionStats, purgeExpiredArticles } from './articles.js'
 export type { RetryStats } from './articles.js'
 export { getCategories, getCategoryById, createCategory, updateCategory, deleteCategory, markAllSeenByCategory } from './categories.js'
@@ -10,3 +10,4 @@ export { createApiKey, listApiKeys, deleteApiKey, validateApiKey } from './apiKe
 export type { ApiKey, ApiKeyCreated } from './apiKeys.js'
 export { insertSimilarity, getSimilarArticles, findReadSimilarArticle } from './similarities.js'
 export type { SimilarArticle } from './similarities.js'
+export { getFreshRssGroupMappingByRemoteId, getFreshRssGroupMappingByLocalCategoryId, upsertFreshRssGroupMapping, getFreshRssFeedMappingByRemoteId, getFreshRssFeedMappingByLocalFeedId, upsertFreshRssFeedMapping, getFreshRssItemMappingByLocalArticleId, upsertFreshRssItemMapping, getFreshRssLocalArticleState, findLocalArticleIdByFeedAndUrl, listFreshRssMappedFeedIds } from './freshrss.js'
