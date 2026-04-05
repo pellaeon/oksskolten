@@ -4,6 +4,7 @@ import { PreviewCard } from '../../../components/settings/preview-card'
 import { useAppLayout } from '../../../app'
 import { RadioGroup } from '@/components/ui/radio-group'
 import type { KeyBindings } from '../../../hooks/use-keyboard-navigation'
+import { FullTextFetchSection } from './full-text-fetch-section'
 
 export function ReadingSection() {
   const { settings } = useAppLayout()
@@ -366,6 +367,8 @@ export function ReadingSection() {
           onChange={setInternalLinks}
         />
       </div>
+
+      <FullTextFetchSection />
 
       <div className="mt-6">
         <p className="text-sm text-text mb-1">{t('settings.categoryUnreadOnly')}</p>

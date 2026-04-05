@@ -287,6 +287,25 @@ describe('PATCH /api/settings/preferences — AI provider/model enums', () => {
   })
 })
 
+describe('PATCH /api/settings/preferences — full-text blacklist', () => {
+  it('stores an empty blacklist instead of deleting the setting', async () => {
+    upsertSetting('reading.full_text_blacklist', 'facebook.com')
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: {
+        'reading.full_text_blacklist': '',
+      },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()['reading.full_text_blacklist']).toBe('')
+    expect(getSetting('reading.full_text_blacklist')).toBe('')
+  })
+})
+
 // =========================================================================
 // POST preferences endpoint (same handler as PATCH)
 // =========================================================================

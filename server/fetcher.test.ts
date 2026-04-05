@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setupTestDb } from './__tests__/helpers/testDb.js'
 import { createFeed, insertArticle, getArticleByUrl, getFeedById, upsertSetting } from './db.js'
 import type { Feed } from './db.js'
+import { FULL_TEXT_BLACKLIST_SETTING_KEY } from '../shared/full-text-fetch.js'
 
 // --- Anthropic mock ---
 
@@ -2108,6 +2109,35 @@ describe('FlareSolverr — fetchFullText', () => {
 
     await expect(fetchFullText('https://cf-blog.example.com/post-1'))
       .rejects.toThrow('HTTP 403')
+  })
+})
+
+describe('fetchArticleContent — hostname blacklist', () => {
+  let fetchArticleContent: typeof import('./fetcher.js').fetchArticleContent
+
+  beforeEach(async () => {
+    const mod = await import('./fetcher.js')
+    fetchArticleContent = mod.fetchArticleContent
+  })
+
+  it('skips full-text fetch for default blacklisted hosts and falls back to RSS content', async () => {
+    const result = await fetchArticleContent('https://facebook.com/some-post', {
+      listingExcerpt: '<p>RSS fallback body</p>',
+    })
+
+    expect(result.fullText).toBe('RSS fallback body')
+    expect(result.excerpt).toBe('RSS fallback body')
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('allows overriding the blacklist to empty', async () => {
+    upsertSetting(FULL_TEXT_BLACKLIST_SETTING_KEY, '')
+    mockFetch.mockResolvedValue(mockResponse(articleHtml({ title: 'Allowed Host' })))
+
+    const result = await fetchArticleContent('https://facebook.com/some-post')
+
+    expect(result.fullText).toContain('paragraph of article content')
+    expect(mockFetch).toHaveBeenCalledTimes(1)
   })
 })
 

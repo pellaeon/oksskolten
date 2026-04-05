@@ -1,6 +1,7 @@
 import {
   getEnabledFeeds,
   getExistingArticleUrls,
+  getSetting,
   getRetryArticles,
   getRetryStats,
   insertArticle,
@@ -21,6 +22,7 @@ import { type FetchRssResult, fetchAndParseRss, RateLimitError } from './fetcher
 import { computeInterval, computeEmpiricalInterval, sqliteFuture, DEFAULT_INTERVAL } from './fetcher/schedule.js'
 import { detectLanguage } from './fetcher/ai.js'
 import { logger } from './logger.js'
+import { FULL_TEXT_BLACKLIST_SETTING_KEY, isUrlHostnameBlacklisted, parseFullTextHostnameBlacklist } from '../shared/full-text-fetch.js'
 
 const log = logger.child('fetcher')
 
@@ -61,6 +63,8 @@ export async function fetchArticleContent(
   let title: string | null = null
 
   const existing = options?.existingArticle
+  const blacklist = parseFullTextHostnameBlacklist(getSetting(FULL_TEXT_BLACKLIST_SETTING_KEY))
+  const isBlacklistedHost = isUrlHostnameBlacklisted(url, blacklist)
 
   // Step 1: Fetch full text (skip if retry article already has content)
   // For anchor-link articles (URL has # fragment), the page is shared across
@@ -74,6 +78,12 @@ export async function fetchArticleContent(
   } else if (isAnchorLink && options?.listingExcerpt) {
     fullText = convertHtmlToMarkdown(options.listingExcerpt)
     excerpt = markdownToExcerpt(fullText)
+  } else if (isBlacklistedHost) {
+    log.info({ url }, 'skipping full-text fetch for blacklisted hostname')
+    if (options?.listingExcerpt) {
+      fullText = convertHtmlToMarkdown(options.listingExcerpt)
+      excerpt = markdownToExcerpt(fullText)
+    }
   } else {
     try {
       const result = await fetchFullText(url, { requiresJsChallenge: options?.requiresJsChallenge })
