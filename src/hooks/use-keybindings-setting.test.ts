@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useKeybindingsSetting } from './use-keybindings-setting'
-import { DEFAULT_KEY_BINDINGS, type KeyBindings } from './use-keyboard-navigation'
+import { DEFAULT_KEY_BINDINGS, type KeyBindings } from '../../shared/keyboard-shortcuts'
 
 const STORAGE_KEY = 'keybindings'
 
@@ -16,7 +16,7 @@ describe('useKeybindingsSetting', () => {
   })
 
   it('returns stored keybindings from localStorage', () => {
-    const custom: KeyBindings = { next: 'n', prev: 'p', bookmark: 'm', openExternal: 'o' }
+    const custom: KeyBindings = { ...DEFAULT_KEY_BINDINGS, next: 'y', prev: 'u', bookmark: 'm', openExternal: 'o' }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(custom))
 
     const { result } = renderHook(() => useKeybindingsSetting())
@@ -25,7 +25,7 @@ describe('useKeybindingsSetting', () => {
 
   it('persists keybindings to localStorage when set', () => {
     const { result } = renderHook(() => useKeybindingsSetting())
-    const custom: KeyBindings = { next: 'n', prev: 'p', bookmark: 'm', openExternal: 'o' }
+    const custom: KeyBindings = { ...DEFAULT_KEY_BINDINGS, next: 'y', prev: 'u', bookmark: 'm', openExternal: 'o' }
 
     act(() => {
       result.current.setKeybindings(custom)

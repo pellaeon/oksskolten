@@ -22,7 +22,7 @@ import { FeedErrorBanner } from '../feed/feed-error-banner'
 import { Skeleton } from '../ui/skeleton'
 import { useKeyboardNavigationContext } from '../../contexts/keyboard-navigation-context'
 import { useKeyboardNavigation } from '../../hooks/use-keyboard-navigation'
-import { apiPatch } from '../../lib/fetcher'
+import { apiPatch, apiPost } from '../../lib/fetcher'
 import type { ArticleListItem, FeedWithCounts } from '../../../shared/types'
 import type { LayoutName } from '../../data/layouts'
 
@@ -134,15 +134,56 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   // Short debounce after overlay close to prevent Escape from immediately clearing focus
   const escapeDebounceRef = useRef(false)
 
+  const toggleReadState = useCallback((article: ArticleListItem) => {
+    const markUnread = !!(article.read_at || article.seen_at)
+    const nextSeenAt = markUnread ? null : new Date().toISOString()
+    const nextReadAt = markUnread ? null : nextSeenAt
+
+    void mutate(
+      (pages) => pages?.map(page => ({
+        ...page,
+        articles: page.articles.map(a =>
+          a.id === article.id
+            ? { ...a, seen_at: nextSeenAt, read_at: nextReadAt }
+            : a
+        ),
+      })),
+      { revalidate: false },
+    )
+
+    const request = markUnread
+      ? apiPatch(`/api/articles/${article.id}/seen`, { seen: false })
+      : apiPost(`/api/articles/${article.id}/read`)
+
+    Promise.resolve(request)
+      .then(() => {
+        void globalMutate((key: string) => typeof key === 'string' && key.startsWith('/api/feeds'))
+      })
+      .catch(() => {
+        void mutate()
+      })
+  }, [globalMutate, mutate])
+
+  const toggleFocusedMedia = useCallback(() => {
+    const media = document.querySelector<HTMLVideoElement | HTMLAudioElement>(
+      '[data-keyboard-nav-passthrough][data-state="open"] video, [data-keyboard-nav-passthrough][data-state="open"] audio',
+    )
+    if (!media) return
+    if (media.paused) {
+      void media.play()
+    } else {
+      media.pause()
+    }
+  }, [])
+
   useKeyboardNavigation({
     items: articleIds,
     focusedItemId,
-    onFocusChange: (id) => {
+    onFocusChange: (id, mode) => {
       setFocusedItemId(id)
       const el = document.querySelector(`[data-article-id="${id}"]`)
       el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-      // Overlay mode: open article immediately on j/k
-      if (isOverlayMode) {
+      if (isOverlayMode && mode !== 'skip') {
         const article = articleMap.get(id)
         if (article) setOverlayUrl(article.url)
       }
@@ -155,6 +196,11 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     onEscape: () => {
       if (escapeDebounceRef.current) return
       setFocusedItemId(null)
+    },
+    onMarkReadToggle: (id) => {
+      const article = articleMap.get(id)
+      if (!article) return
+      toggleReadState(article)
     },
     onBookmarkToggle: (id) => {
       const article = articleMap.get(id)
@@ -185,7 +231,12 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
       const article = articleMap.get(id)
       if (article?.url) window.open(article.url, '_blank')
     },
+    onToggleMedia: toggleFocusedMedia,
     onNearEnd: () => loadMoreRef.current(),
+    isItemUnread: (id) => {
+      const article = articleMap.get(id)
+      return !!article && !article.seen_at
+    },
     enabled: isKeyboardNavEnabled,
     keyBindings: keybindings,
   })

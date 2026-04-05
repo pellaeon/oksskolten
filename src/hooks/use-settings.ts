@@ -306,7 +306,7 @@ export function useSettings() {
   }, [setDateMode, setAutoMarkRead, setShowUnreadIndicator, setInternalLinks, setShowThumbnails, setShowFeedActivity, setChatPosition, setArticleOpenMode, setCategoryUnreadOnly, setLayout, setArticleFont, setMascot])
 
   // Special: keybindings setter serializes to JSON
-  const syncedSetKeybindings = useCallback((value: import('./use-keyboard-navigation').KeyBindings) => {
+  const syncedSetKeybindings = useCallback((value: import('../../shared/keyboard-shortcuts').KeyBindings) => {
     dirtyKeysRef.current.add('reading.keybindings')
     setKeybindings(value)
     pendingRef.current['reading.keybindings'] = JSON.stringify(value)

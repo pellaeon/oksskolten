@@ -16,6 +16,7 @@ import { getMonthlyUsage } from '../providers/translate/google-translate.js'
 import { getDeeplMonthlyUsage } from '../providers/translate/deepl.js'
 import { parseOrBadRequest } from '../lib/validation.js'
 import { FULL_TEXT_BLACKLIST_SETTING_KEY } from '../../shared/full-text-fetch.js'
+import { KEY_BINDING_ACTIONS, isValidKeyBindings } from '../../shared/keyboard-shortcuts.js'
 
 const ProfileBody = z.object({
   account_name: z.string().optional(),
@@ -193,20 +194,10 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
       if (key === 'reading.keybindings') {
         try {
           const parsed = JSON.parse(value)
-          const validKeys = new Set(['next', 'prev', 'bookmark', 'openExternal'])
-          const keys = Object.keys(parsed)
-          if (keys.length !== 4 || !keys.every(k => validKeys.has(k))) {
-            reply.status(400).send({ error: 'Invalid keybindings: keys must be next, prev, bookmark, openExternal' })
-            return
-          }
-          const PRINTABLE_RE = /^[!-~]$/
-          const vals = Object.values(parsed) as string[]
-          if (!vals.every(v => typeof v === 'string' && PRINTABLE_RE.test(v))) {
-            reply.status(400).send({ error: 'Invalid keybindings: values must be single printable ASCII characters' })
-            return
-          }
-          if (new Set(vals).size !== vals.length) {
-            reply.status(400).send({ error: 'Invalid keybindings: duplicate key assignments are not allowed' })
+          if (!isValidKeyBindings(parsed)) {
+            reply.status(400).send({
+              error: `Invalid keybindings: keys must be ${KEY_BINDING_ACTIONS.join(', ')} with unique valid key tokens`,
+            })
             return
           }
         } catch {

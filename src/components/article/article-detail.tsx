@@ -3,11 +3,12 @@ import { useNavigate, Link } from 'react-router-dom'
 import useSWR from 'swr'
 import { renderMarkdown } from '../../lib/markdown'
 import { sanitizeHtml } from '../../lib/sanitize'
-import { fetcher, apiPost } from '../../lib/fetcher'
+import { fetcher, apiPatch, apiPost } from '../../lib/fetcher'
 import { queueSeenIds } from '../../lib/offlineQueue'
 import { useSWRConfig } from 'swr'
 import { trackRead } from '../../lib/readTracker'
 import { useArticleActions } from '../../hooks/use-article-actions'
+import { eventToKeyBindingToken } from '../../lib/keyboard-shortcuts'
 import { useI18n } from '../../lib/i18n'
 import { useRewriteInternalLinks } from '../../hooks/use-rewrite-internal-links'
 import { ImageLightbox } from '../ui/image-lightbox'
@@ -30,10 +31,11 @@ import type { ArticleDetail as ArticleDetailData } from '../../../shared/types'
 
 interface ArticleDetailProps {
   articleUrl: string
+  enableActionShortcuts?: boolean
 }
 
-export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
-  const { settings: { internalLinks, chatPosition, translateTargetLang } } = useAppLayout()
+export function ArticleDetail({ articleUrl, enableActionShortcuts = true }: ArticleDetailProps) {
+  const { settings: { internalLinks, chatPosition, translateTargetLang, keyboardNavigation, keybindings } } = useAppLayout()
   const navigate = useNavigate()
   const { t, tError, isKeyNotSetError, locale } = useI18n()
   const articleKey = `/api/articles/by-url?url=${encodeURIComponent(articleUrl)}`
@@ -91,6 +93,66 @@ export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
         })
     }
   }, [article, globalMutate])
+
+  useEffect(() => {
+    if (!enableActionShortcuts || keyboardNavigation !== 'on' || !article) return
+    const currentArticle = article
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return
+
+      const target = e.target as HTMLElement
+      const isInput =
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) ||
+        target.isContentEditable ||
+        (typeof target.getAttribute === 'function' && target.getAttribute('contenteditable') === 'true')
+      if (isInput) return
+
+      const token = eventToKeyBindingToken(e.key)
+      if (!token) return
+
+      if (token === keybindings.markRead) {
+        const markUnread = !!(currentArticle.read_at || currentArticle.seen_at)
+        const nextSeenAt = markUnread ? null : new Date().toISOString()
+        const nextReadAt = markUnread ? null : nextSeenAt
+        void mutate({ ...currentArticle, seen_at: nextSeenAt, read_at: nextReadAt }, false)
+        const request = markUnread
+          ? apiPatch(`/api/articles/${currentArticle.id}/seen`, { seen: false })
+          : apiPost(`/api/articles/${currentArticle.id}/read`)
+        Promise.resolve(request)
+          .then(() => globalMutate((key: string) => typeof key === 'string' && key.startsWith('/api/feeds')))
+          .catch(() => { void mutate() })
+        e.preventDefault()
+        return
+      }
+
+      if (token === keybindings.bookmark) {
+        void toggleBookmark()
+        e.preventDefault()
+        return
+      }
+
+      if (token === keybindings.openExternal) {
+        window.open(currentArticle.url, '_blank', 'noopener')
+        e.preventDefault()
+        return
+      }
+
+      if (token === keybindings.toggleMedia) {
+        const media = articleRef.current?.querySelector<HTMLVideoElement | HTMLAudioElement>('video, audio')
+        if (!media) return
+        if (media.paused) {
+          void media.play()
+        } else {
+          media.pause()
+        }
+        e.preventDefault()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [article, enableActionShortcuts, globalMutate, keyboardNavigation, keybindings, mutate, toggleBookmark])
 
   const content = useMemo(() => {
     if (!article) return ''

@@ -3,8 +3,9 @@ import { useI18n, type TranslateFn } from '../../../lib/i18n'
 import { PreviewCard } from '../../../components/settings/preview-card'
 import { useAppLayout } from '../../../app'
 import { RadioGroup } from '@/components/ui/radio-group'
-import type { KeyBindings } from '../../../hooks/use-keyboard-navigation'
 import { FullTextFetchSection } from './full-text-fetch-section'
+import { eventToKeyBindingToken, formatKeyBindingToken } from '../../../lib/keyboard-shortcuts'
+import type { KeyBindingAction, KeyBindings } from '../../../../shared/keyboard-shortcuts'
 
 export function ReadingSection() {
   const { settings } = useAppLayout()
@@ -423,23 +424,28 @@ function KeybindingsEditor({
 
   useEffect(() => { setDraft(keybindings) }, [keybindings])
 
-  const actions: Array<{ key: keyof KeyBindings; label: string }> = [
+  const actions: Array<{ key: KeyBindingAction; label: string }> = [
     { key: 'next', label: t('settings.keybindingsNext') },
+    { key: 'nextUnread', label: t('settings.keybindingsNextUnread') },
     { key: 'prev', label: t('settings.keybindingsPrev') },
+    { key: 'skipNext', label: t('settings.keybindingsSkipNext') },
+    { key: 'skipPrev', label: t('settings.keybindingsSkipPrev') },
+    { key: 'first', label: t('settings.keybindingsFirst') },
+    { key: 'last', label: t('settings.keybindingsLast') },
+    { key: 'markRead', label: t('settings.keybindingsMarkRead') },
     { key: 'bookmark', label: t('settings.keybindingsBookmark') },
     { key: 'openExternal', label: t('settings.keybindingsOpenExternal') },
+    { key: 'toggleMedia', label: t('settings.keybindingsToggleMedia') },
   ]
 
   const values = Object.values(draft)
   const hasDuplicate = new Set(values).size !== values.length
 
-  const PRINTABLE_RE = /^[!-~]$/
-
-  const handleChange = (action: keyof KeyBindings, value: string) => {
+  const handleChange = (action: KeyBindingAction, value: string) => {
     const next = { ...draft, [action]: value }
     setDraft(next)
     const nextValues = Object.values(next)
-    if (new Set(nextValues).size === nextValues.length && nextValues.every(v => PRINTABLE_RE.test(v))) {
+    if (new Set(nextValues).size === nextValues.length) {
       setKeybindings(next)
     }
   }
@@ -451,20 +457,24 @@ function KeybindingsEditor({
       <div className="space-y-2">
         {actions.map(({ key, label }) => (
           <div key={key} className="flex items-center gap-3">
-            <span className="text-sm text-text w-32">{label}</span>
+            <span className="text-sm text-text w-40">{label}</span>
             <input
               type="text"
-              maxLength={1}
-              value={draft[key]}
-              onChange={(e) => handleChange(key, e.target.value)}
-              onBlur={() => {
-                if (!draft[key]) setDraft(prev => ({ ...prev, [key]: keybindings[key] }))
+              readOnly
+              value={formatKeyBindingToken(draft[key])}
+              onKeyDown={(e) => {
+                if (e.key === 'Tab') return
+                const token = eventToKeyBindingToken(e.key)
+                if (!token) return
+                e.preventDefault()
+                handleChange(key, token)
               }}
-              className="w-10 h-8 text-center text-sm border border-border rounded bg-bg-card text-text focus:outline-none focus:ring-1 focus:ring-accent"
+              className="w-16 h-8 text-center text-sm border border-border rounded bg-bg-card text-text focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </div>
         ))}
       </div>
+      <p className="text-xs text-muted mt-2">{t('settings.keybindingsCaptureHint')}</p>
       {hasDuplicate && (
         <p className="text-xs text-error mt-2">{t('settings.keybindingsDuplicate')}</p>
       )}

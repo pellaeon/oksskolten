@@ -29,7 +29,7 @@ export function ArticleOverlay({ articleUrl, onClose }: ArticleOverlayProps) {
               <X className="w-5 h-5 text-muted" />
             </button>
           </div>
-          {articleUrl && <ArticleDetail articleUrl={articleUrl} />}
+          {articleUrl && <ArticleDetail articleUrl={articleUrl} enableActionShortcuts={false} />}
         </DialogPrimitive.Content>
       </DialogPortal>
     </Dialog>
