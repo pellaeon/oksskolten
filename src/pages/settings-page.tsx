@@ -10,13 +10,14 @@ import { ApiTokenSettings } from '../components/settings/api-token-settings'
 import { ImageStorageSettings } from '../components/settings/image-storage-settings'
 import { GeneralTab } from './settings/general-tab'
 const AppearanceTab = lazy(() => import('./settings/appearance-tab').then(m => ({ default: m.AppearanceTab })))
+import { AiTab } from './settings/ai-tab'
 import { IntegrationTab } from './settings/integration-tab'
 import { DataTab } from './settings/data-tab'
 import { Separator } from '@/components/ui/separator'
 
 declare const __APP_VERSION__: string
 
-const TABS = ['general', 'appearance', 'integration', 'plugins', 'security', 'data', 'viewer', 'about'] as const
+const TABS = ['general', 'appearance', 'ai', 'integration', 'plugins', 'security', 'data', 'viewer', 'about'] as const
 
 export function SettingsPage() {
   const { tab: tabParam } = useParams<{ tab?: string }>()
@@ -86,6 +87,10 @@ export function SettingsPage() {
             <Suspense>
               <AppearanceTab />
             </Suspense>
+          )}
+
+          {tab === 'ai' && (
+            <AiTab />
           )}
 
           {tab === 'integration' && (

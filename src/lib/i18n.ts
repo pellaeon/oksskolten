@@ -194,6 +194,7 @@ const dict = {
   'settings.title': { ja: '設定', en: 'Settings' },
   'settings.general': { ja: '一般', en: 'General' },
   'settings.appearance': { ja: '外観', en: 'Appearance' },
+  'settings.ai': { ja: 'AI・翻訳', en: 'AI & Translation' },
   'settings.colorMode': { ja: 'カラーモード', en: 'Color mode' },
   'settings.colorModeDesc': { ja: 'アプリ全体の明暗を切り替えます。「自動」はOSの設定に連動します', en: 'Switch between light and dark appearance. "Auto" follows your OS setting' },
   'settings.colorModeLight': { ja: 'ライト', en: 'Light' },
@@ -485,7 +486,7 @@ const dict = {
   'login.githubError': { ja: 'GitHub認証に失敗しました', en: 'GitHub authentication failed' },
 
   // Settings — AI
-  'settings.integration': { ja: 'AI・翻訳', en: 'AI & Translation' },
+  'settings.integration': { ja: '連携', en: 'Integration' },
   'integration.providerConfig': { ja: 'プロバイダー設定', en: 'Provider Configuration' },
   'integration.providerConfigDesc': { ja: 'APIキーや認証情報を管理します', en: 'Manage API keys and authentication' },
   'integration.llmProviderConfig': { ja: 'LLM プロバイダー', en: 'LLM Providers' },
