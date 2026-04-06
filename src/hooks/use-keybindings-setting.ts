@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
+  coerceKeyBindings,
   DEFAULT_KEY_BINDINGS,
-  isValidKeyBindings,
   type KeyBindings,
 } from '../../shared/keyboard-shortcuts'
 
@@ -11,8 +11,7 @@ function getStored(): KeyBindings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return DEFAULT_KEY_BINDINGS
-    const parsed = JSON.parse(raw)
-    return isValidKeyBindings(parsed) ? parsed : DEFAULT_KEY_BINDINGS
+    return coerceKeyBindings(JSON.parse(raw))
   } catch {
     return DEFAULT_KEY_BINDINGS
   }

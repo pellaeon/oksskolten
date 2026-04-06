@@ -433,6 +433,7 @@ function KeybindingsEditor({
     { key: 'first', label: t('settings.keybindingsFirst') },
     { key: 'last', label: t('settings.keybindingsLast') },
     { key: 'markRead', label: t('settings.keybindingsMarkRead') },
+    { key: 'like', label: t('settings.keybindingsLike') },
     { key: 'bookmark', label: t('settings.keybindingsBookmark') },
     { key: 'openExternal', label: t('settings.keybindingsOpenExternal') },
     { key: 'toggleMedia', label: t('settings.keybindingsToggleMedia') },

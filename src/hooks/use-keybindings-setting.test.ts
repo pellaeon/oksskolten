@@ -48,4 +48,24 @@ describe('useKeybindingsSetting', () => {
     const { result } = renderHook(() => useKeybindingsSetting())
     expect(result.current.keybindings).toEqual(DEFAULT_KEY_BINDINGS)
   })
+
+  it('migrates the old bookmark-on-f schema to like-on-f and read-later-on-l', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      next: 'j',
+      nextUnread: 'h',
+      prev: 'k',
+      skipNext: 'n',
+      skipPrev: 'p',
+      first: 'home',
+      last: 'end',
+      markRead: 'r',
+      bookmark: 'f',
+      openExternal: 'space',
+      toggleMedia: 'v',
+    }))
+
+    const { result } = renderHook(() => useKeybindingsSetting())
+    expect(result.current.keybindings.like).toBe('f')
+    expect(result.current.keybindings.bookmark).toBe('l')
+  })
 })

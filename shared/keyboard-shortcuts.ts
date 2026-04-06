@@ -7,6 +7,7 @@ export const KEY_BINDING_ACTIONS = [
   'first',
   'last',
   'markRead',
+  'like',
   'bookmark',
   'openExternal',
   'toggleMedia',
@@ -28,7 +29,8 @@ export const DEFAULT_KEY_BINDINGS: KeyBindings = {
   first: 'home',
   last: 'end',
   markRead: 'r',
-  bookmark: 'f',
+  like: 'f',
+  bookmark: 'l',
   openExternal: 'space',
   toggleMedia: 'v',
 }
@@ -59,4 +61,26 @@ export function isValidKeyBindings(value: unknown): value is KeyBindings {
 
   const normalized = tokens.map(token => normalizeKeyBindingToken(token as string))
   return new Set(normalized).size === normalized.length
+}
+
+export function coerceKeyBindings(value: unknown): KeyBindings {
+  if (isValidKeyBindings(value)) return value
+  if (typeof value !== 'object' || value === null) return DEFAULT_KEY_BINDINGS
+
+  const raw = value as Record<string, unknown>
+  const next: KeyBindings = { ...DEFAULT_KEY_BINDINGS }
+
+  for (const key of KEY_BINDING_ACTIONS) {
+    const token = raw[key]
+    if (typeof token === 'string' && isValidKeyBindingToken(token)) {
+      next[key] = normalizeKeyBindingToken(token)
+    }
+  }
+
+  if (raw.like === undefined && raw.bookmark === 'f') {
+    next.like = 'f'
+    next.bookmark = 'l'
+  }
+
+  return isValidKeyBindings(next) ? next : DEFAULT_KEY_BINDINGS
 }

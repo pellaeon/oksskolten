@@ -15,6 +15,7 @@ interface UseKeyboardNavigationOptions {
   onEnter?: (id: string) => void
   onEscape?: () => void
   onMarkReadToggle?: (id: string) => void
+  onLikeToggle?: (id: string) => void
   onBookmarkToggle?: (id: string) => void
   onOpenExternal?: (id: string) => void
   onToggleMedia?: () => void
@@ -34,7 +35,7 @@ export function useKeyboardNavigation(options: UseKeyboardNavigationOptions) {
     if (!options.enabled) return
 
     function handleKeyDown(e: KeyboardEvent) {
-      const { items, focusedItemId, onFocusChange, onEnter, onEscape, onMarkReadToggle, onBookmarkToggle, onOpenExternal, onToggleMedia, onNearEnd, isItemUnread, keyBindings } = optionsRef.current
+      const { items, focusedItemId, onFocusChange, onEnter, onEscape, onMarkReadToggle, onLikeToggle, onBookmarkToggle, onOpenExternal, onToggleMedia, onNearEnd, isItemUnread, keyBindings } = optionsRef.current
       const bindings = keyBindings ?? DEFAULT_KEY_BINDINGS
 
       const target = e.target as HTMLElement
@@ -135,6 +136,12 @@ export function useKeyboardNavigation(options: UseKeyboardNavigationOptions) {
       if (token === bindings.markRead && focusedItemId && onMarkReadToggle) {
         e.preventDefault()
         onMarkReadToggle(focusedItemId)
+        return
+      }
+
+      if (token === bindings.like && focusedItemId && onLikeToggle) {
+        e.preventDefault()
+        onLikeToggle(focusedItemId)
         return
       }
 

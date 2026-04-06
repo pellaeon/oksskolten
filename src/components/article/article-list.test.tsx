@@ -26,6 +26,7 @@ const mockApiPost = vi.fn(() => Promise.resolve())
 const mockTrackRead = vi.fn()
 const mockUntrackRead = vi.fn()
 const mockIsReadInSession = vi.fn(() => false)
+const mockGlobalMutate = vi.fn()
 
 vi.mock('swr/infinite', () => ({
   default: () => swrInfiniteReturn,
@@ -39,7 +40,7 @@ vi.mock('swr', async () => {
       if (key === '/api/feeds') return { data: swrFeedsData }
       return { data: undefined }
     },
-    useSWRConfig: () => ({ mutate: vi.fn() }),
+    useSWRConfig: () => ({ mutate: mockGlobalMutate }),
   }
 })
 
@@ -225,6 +226,7 @@ describe('ArticleList', () => {
     vi.clearAllMocks()
     swrFeedsData = undefined
     latestKeyboardNavigationOptions = null
+    mockGlobalMutate.mockReset()
     mockSettings.autoMarkRead = 'off' as any
     mockSettings.articleOpenMode = 'page' as any
     mockSettings.keyboardNavigation = 'on' as any
@@ -330,6 +332,58 @@ describe('ArticleList', () => {
 
     expect(mockApiPatch).toHaveBeenCalledWith('/api/articles/1/seen', { seen: false })
     expect(mockUntrackRead).toHaveBeenCalledWith(1)
+  })
+
+  it('updates the article detail cache when keyboard like toggle runs', () => {
+    swrInfiniteReturn = {
+      data: [{
+        articles: [makeArticle({ id: 1, title: 'Focused Article', url: 'https://example.com/1' })],
+        total: 1,
+        has_more: false,
+      }],
+      error: undefined,
+      size: 1,
+      setSize: vi.fn(),
+      isLoading: false,
+      isValidating: false,
+      mutate: vi.fn(),
+    }
+
+    renderArticleList()
+
+    latestKeyboardNavigationOptions.onLikeToggle('1')
+
+    expect(mockGlobalMutate).toHaveBeenCalledWith(
+      '/api/articles/by-url?url=https%3A%2F%2Fexample.com%2F1',
+      expect.any(Function),
+      false,
+    )
+  })
+
+  it('updates the article detail cache when keyboard read-later toggle runs', () => {
+    swrInfiniteReturn = {
+      data: [{
+        articles: [makeArticle({ id: 1, title: 'Focused Article', url: 'https://example.com/1' })],
+        total: 1,
+        has_more: false,
+      }],
+      error: undefined,
+      size: 1,
+      setSize: vi.fn(),
+      isLoading: false,
+      isValidating: false,
+      mutate: vi.fn(),
+    }
+
+    renderArticleList()
+
+    latestKeyboardNavigationOptions.onBookmarkToggle('1')
+
+    expect(mockGlobalMutate).toHaveBeenCalledWith(
+      '/api/articles/by-url?url=https%3A%2F%2Fexample.com%2F1',
+      expect.any(Function),
+      false,
+    )
   })
 
   it('updates the visible overlay article on skip-next in overlay mode', () => {

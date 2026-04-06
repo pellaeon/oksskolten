@@ -134,6 +134,12 @@ export function ArticleDetail({ articleUrl, enableActionShortcuts = true }: Arti
         return
       }
 
+      if (token === keybindings.like) {
+        void toggleLike()
+        e.preventDefault()
+        return
+      }
+
       if (token === keybindings.bookmark) {
         void toggleBookmark()
         e.preventDefault()
@@ -160,7 +166,7 @@ export function ArticleDetail({ articleUrl, enableActionShortcuts = true }: Arti
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [article, enableActionShortcuts, globalMutate, keyboardNavigation, keybindings, mutate, toggleBookmark])
+  }, [article, enableActionShortcuts, globalMutate, keyboardNavigation, keybindings, mutate, toggleBookmark, toggleLike])
 
   const content = useMemo(() => {
     if (!article) return ''

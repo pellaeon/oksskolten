@@ -205,10 +205,39 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
       if (!article) return
       toggleReadState(article)
     },
+    onLikeToggle: (id) => {
+      const article = articleMap.get(id)
+      if (!article) return
+      const next = !article.liked_at
+      const articleKey = `/api/articles/by-url?url=${encodeURIComponent(article.url)}`
+      void mutate(
+        (pages) => pages?.map(page => ({
+          ...page,
+          articles: page.articles.map(a =>
+            String(a.id) === id
+              ? { ...a, liked_at: next ? new Date().toISOString() : null }
+              : a
+          ),
+        })),
+        { revalidate: false },
+      )
+      void globalMutate(articleKey, (current: ArticleListItem | { liked_at: string | null } | undefined) => (
+        current ? { ...current, liked_at: next ? new Date().toISOString() : null } : current
+      ), false)
+      apiPatch(`/api/articles/${article.id}/like`, { liked: next })
+        .then(() => {
+          void globalMutate((key: string) => typeof key === 'string' && key.startsWith('/api/feeds'))
+        })
+        .catch(() => {
+          void globalMutate(articleKey)
+          void mutate()
+        })
+    },
     onBookmarkToggle: (id) => {
       const article = articleMap.get(id)
       if (!article) return
       const next = !article.bookmarked_at
+      const articleKey = `/api/articles/by-url?url=${encodeURIComponent(article.url)}`
       // Optimistic update: flip bookmarked_at in local SWR cache immediately
       void mutate(
         (pages) => pages?.map(page => ({
@@ -221,11 +250,15 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
         })),
         { revalidate: false },
       )
+      void globalMutate(articleKey, (current: ArticleListItem | { bookmarked_at: string | null } | undefined) => (
+        current ? { ...current, bookmarked_at: next ? new Date().toISOString() : null } : current
+      ), false)
       apiPatch(`/api/articles/${article.id}/bookmark`, { bookmarked: next })
         .then(() => {
           void globalMutate((key: string) => typeof key === 'string' && key.startsWith('/api/feeds'))
         })
         .catch(() => {
+          void globalMutate(articleKey)
           // Roll back on failure
           void mutate()
         })

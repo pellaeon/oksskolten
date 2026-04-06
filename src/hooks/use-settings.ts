@@ -17,6 +17,7 @@ import { useLayout } from './use-layout'
 import { useMascot, type MascotChoice } from './use-mascot'
 import { useKeyboardNavSetting } from './use-keyboard-nav-setting'
 import { useKeybindingsSetting } from './use-keybindings-setting'
+import { coerceKeyBindings } from '../../shared/keyboard-shortcuts'
 import type { LayoutName } from '../data/layouts'
 import type { Theme } from '../data/themes'
 import { fetcher, apiPatch, authHeaders } from '../lib/fetcher'
@@ -164,7 +165,7 @@ export function useSettings() {
         backfillDefault: 'on',
         validate: v => v === 'on' || v === 'off' },
       { key: 'reading.keybindings', setter: (v: string) => {
-        try { const parsed = JSON.parse(v); setKeybindings(parsed) } catch { /* ignore invalid JSON */ }
+        try { setKeybindings(coerceKeyBindings(JSON.parse(v))) } catch { /* ignore invalid JSON */ }
       } },
       { key: 'appearance.highlight_theme', setter: setHighlightTheme },
       { key: 'appearance.font_family', setter: setArticleFont },

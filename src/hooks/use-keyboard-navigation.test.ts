@@ -286,7 +286,21 @@ describe('useKeyboardNavigation', () => {
   })
 
   describe('action callbacks', () => {
-    it('calls onBookmarkToggle when b is pressed with a focused item', () => {
+    it('calls onLikeToggle when f is pressed with a focused item', () => {
+      const onLikeToggle = vi.fn()
+      renderHook(() => useKeyboardNavigation({
+        items: ['a', 'b'],
+        focusedItemId: 'a',
+        onFocusChange: vi.fn(),
+        onLikeToggle,
+        enabled: true,
+      }))
+
+      fireKey('f')
+      expect(onLikeToggle).toHaveBeenCalledWith('a')
+    })
+
+    it('calls onBookmarkToggle when l is pressed with a focused item', () => {
       const onBookmarkToggle = vi.fn()
       renderHook(() => useKeyboardNavigation({
         items: ['a', 'b'],
@@ -296,7 +310,7 @@ describe('useKeyboardNavigation', () => {
         enabled: true,
       }))
 
-      fireKey('f')
+      fireKey('l')
       expect(onBookmarkToggle).toHaveBeenCalledWith('a')
     })
 
@@ -315,19 +329,23 @@ describe('useKeyboardNavigation', () => {
     })
 
     it('does not call action callbacks when no item is focused', () => {
+      const onLikeToggle = vi.fn()
       const onBookmarkToggle = vi.fn()
       const onOpenExternal = vi.fn()
       renderHook(() => useKeyboardNavigation({
         items: ['a', 'b'],
         focusedItemId: null,
         onFocusChange: vi.fn(),
+        onLikeToggle,
         onBookmarkToggle,
         onOpenExternal,
         enabled: true,
       }))
 
       fireKey('f')
+      fireKey('l')
       fireKey(' ')
+      expect(onLikeToggle).not.toHaveBeenCalled()
       expect(onBookmarkToggle).not.toHaveBeenCalled()
       expect(onOpenExternal).not.toHaveBeenCalled()
     })
@@ -420,6 +438,21 @@ describe('useKeyboardNavigation', () => {
 
       fireKey('m')
       expect(onBookmarkToggle).toHaveBeenCalledWith('a')
+    })
+
+    it('uses custom like key', () => {
+      const onLikeToggle = vi.fn()
+      renderHook(() => useKeyboardNavigation({
+        items: ['a', 'b'],
+        focusedItemId: 'a',
+        onFocusChange: vi.fn(),
+        onLikeToggle,
+        enabled: true,
+        keyBindings: { ...DEFAULT_KEY_BINDINGS, next: 'y', prev: 'u', like: 'g', bookmark: 'm', openExternal: 'o' },
+      }))
+
+      fireKey('g')
+      expect(onLikeToggle).toHaveBeenCalledWith('a')
     })
 
     it('uses custom openExternal key', () => {
