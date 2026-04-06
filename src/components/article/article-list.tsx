@@ -6,7 +6,7 @@ import { useSWRConfig } from 'swr'
 import { fetcher } from '../../lib/fetcher'
 import { markSeenOnServer } from '../../lib/markSeenWithQueue'
 import { useI18n } from '../../lib/i18n'
-import { trackRead } from '../../lib/readTracker'
+import { isReadInSession, trackRead, untrackRead } from '../../lib/readTracker'
 import { useIsTouchDevice } from '../../hooks/use-is-touch-device'
 import { useClipFeedId } from '../../hooks/use-clip-feed-id'
 import { useAppLayout } from '../../app'
@@ -135,9 +135,12 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const escapeDebounceRef = useRef(false)
 
   const toggleReadState = useCallback((article: ArticleListItem) => {
-    const markUnread = !!(article.read_at || article.seen_at)
+    const markUnread = !!(article.read_at || article.seen_at || isReadInSession(article.id))
     const nextSeenAt = markUnread ? null : new Date().toISOString()
     const nextReadAt = markUnread ? null : nextSeenAt
+
+    if (markUnread) untrackRead(article.id)
+    else trackRead(article.id)
 
     void mutate(
       (pages) => pages?.map(page => ({
@@ -179,11 +182,11 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   useKeyboardNavigation({
     items: articleIds,
     focusedItemId,
-    onFocusChange: (id, mode) => {
+    onFocusChange: (id) => {
       setFocusedItemId(id)
       const el = document.querySelector(`[data-article-id="${id}"]`)
       el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-      if (isOverlayMode && mode !== 'skip') {
+      if (isOverlayMode) {
         const article = articleMap.get(id)
         if (article) setOverlayUrl(article.url)
       }

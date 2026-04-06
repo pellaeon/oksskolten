@@ -4,11 +4,13 @@ import { MemoryRouter, Routes, Route, Outlet } from 'react-router-dom'
 import { SWRConfig } from 'swr'
 import { LocaleContext } from '../../lib/i18n'
 import { TooltipProvider } from '../ui/tooltip'
+import { DEFAULT_KEY_BINDINGS } from '../../../shared/keyboard-shortcuts'
 
-const { mockApiPatch, mockApiPost, mockTrackRead, mockQueueSeenIds } = vi.hoisted(() => ({
+const { mockApiPatch, mockApiPost, mockTrackRead, mockUntrackRead, mockQueueSeenIds } = vi.hoisted(() => ({
   mockApiPatch: vi.fn(),
   mockApiPost: vi.fn(() => Promise.resolve()),
   mockTrackRead: vi.fn(),
+  mockUntrackRead: vi.fn(),
   mockQueueSeenIds: vi.fn((_ids: number[]) => Promise.resolve()),
 }))
 
@@ -23,6 +25,7 @@ vi.mock('../../lib/fetcher', async () => {
 
 vi.mock('../../lib/readTracker', () => ({
   trackRead: (...args: unknown[]) => mockTrackRead(...args),
+  untrackRead: (...args: unknown[]) => mockUntrackRead(...args),
 }))
 
 vi.mock('../../lib/offlineQueue', () => ({
@@ -92,6 +95,14 @@ const mockSettings = {
   setShowThumbnails: vi.fn(),
   showFeedActivity: 'on' as const,
   setShowFeedActivity: vi.fn(),
+  chatPosition: 'fab' as const,
+  setChatPosition: vi.fn(),
+  translateTargetLang: null as any,
+  setTranslateTargetLang: vi.fn(),
+  keyboardNavigation: 'on' as const,
+  setKeyboardNavigation: vi.fn(),
+  keybindings: DEFAULT_KEY_BINDINGS,
+  setKeybindings: vi.fn(),
   highlightTheme: 'github-dark' as const,
   setHighlightTheme: vi.fn(),
   articleFont: 'sans' as const,
@@ -369,5 +380,65 @@ describe('ArticleDetail stale translation filtering', () => {
     expect(mockUseTranslate).toHaveBeenCalled()
     const firstArg = mockUseTranslate.mock.calls[0]![0]
     expect(firstArg).toEqual({ id: 1, full_text_translated: null })
+  })
+})
+
+describe('ArticleDetail read shortcut', () => {
+  const articleUrl = 'https://example.com/posts/1'
+  const articleKey = `/api/articles/by-url?url=${encodeURIComponent(articleUrl)}`
+
+  beforeEach(() => {
+    mockApiPatch.mockReset()
+    mockApiPatch.mockResolvedValue({ seen_at: null, read_at: null })
+    mockApiPost.mockReset()
+    mockApiPost.mockImplementation(() => Promise.resolve({ seen_at: '2026-03-04T00:00:00.000Z', read_at: '2026-03-04T00:00:00.000Z' } as any))
+    mockTrackRead.mockReset()
+    mockQueueSeenIds.mockClear()
+  })
+
+  it('toggles back to unread after the mount-time read sync updates local state', async () => {
+    const article = {
+      id: 1,
+      feed_id: 2,
+      feed_name: 'Example Feed',
+      title: 'Example Article',
+      url: articleUrl,
+      published_at: '2026-03-04T00:00:00.000Z',
+      lang: 'en',
+      summary: null,
+      full_text: 'Body',
+      full_text_translated: null,
+      translated_lang: null,
+      seen_at: null,
+      read_at: null,
+      bookmarked_at: null,
+      liked_at: null,
+    }
+
+    render(
+      <MemoryRouter>
+        <LocaleContext.Provider value={{ locale: 'en', setLocale: vi.fn() }}>
+          <TooltipProvider>
+            <SWRConfig value={{ provider: () => new Map(), fallback: { [articleKey]: article } }}>
+              <Routes>
+                <Route element={<OutletWrapper />}>
+                  <Route path="*" element={<ArticleDetail articleUrl={articleUrl} />} />
+                </Route>
+              </Routes>
+            </SWRConfig>
+          </TooltipProvider>
+        </LocaleContext.Provider>
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(mockApiPost).toHaveBeenCalledWith('/api/articles/1/read')
+    })
+
+    fireEvent.keyDown(document, { key: 'r' })
+
+    await waitFor(() => {
+      expect(mockApiPatch).toHaveBeenCalledWith('/api/articles/1/seen', { seen: false })
+    })
   })
 })

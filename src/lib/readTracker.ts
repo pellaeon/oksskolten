@@ -9,6 +9,10 @@ export function trackRead(id: number) {
   readIds.add(id)
 }
 
+export function untrackRead(id: number) {
+  readIds.delete(id)
+}
+
 export function isReadInSession(id: number): boolean {
   return readIds.has(id)
 }

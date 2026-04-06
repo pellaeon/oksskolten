@@ -134,6 +134,7 @@ export function useSettings() {
       key: keyof Prefs
       setter: (v: any) => void
       backfillRef?: React.MutableRefObject<string>
+      backfillDefault?: string
       validate?: (v: string) => boolean
     }> = [
       { key: 'appearance.color_theme', setter: setTheme, backfillRef: themeNameRef },
@@ -160,6 +161,7 @@ export function useSettings() {
       { key: 'appearance.mascot', setter: setMascot, backfillRef: mascotRef,
         validate: v => v === 'off' || v === 'dream-puff' || v === 'sleepy-giant' },
       { key: 'reading.keyboard_navigation', setter: setKeyboardNavigation, backfillRef: keyboardNavigationRef,
+        backfillDefault: 'on',
         validate: v => v === 'on' || v === 'off' },
       { key: 'reading.keybindings', setter: (v: string) => {
         try { const parsed = JSON.parse(v); setKeybindings(parsed) } catch { /* ignore invalid JSON */ }
@@ -175,14 +177,20 @@ export function useSettings() {
       { key: 'translate.target_lang', setter: setTranslateTargetLangState },
     ]
 
-    for (const { key, setter, backfillRef, validate } of hydrationMap) {
+    for (const { key, setter, backfillRef, backfillDefault, validate } of hydrationMap) {
       if (dirty.has(key)) continue
       const value = prefs[key]
       if (value) {
         if (!validate || validate(value)) setter(value)
-        else if (backfillRef) backfill[key] = backfillRef.current
+        else if (backfillRef) {
+          const fallback = backfillDefault ?? backfillRef.current
+          setter(fallback)
+          backfill[key] = fallback
+        }
       } else if (backfillRef) {
-        backfill[key] = backfillRef.current
+        const fallback = backfillDefault ?? backfillRef.current
+        setter(fallback)
+        backfill[key] = fallback
       }
     }
 

@@ -6,7 +6,7 @@ import { sanitizeHtml } from '../../lib/sanitize'
 import { fetcher, apiPatch, apiPost } from '../../lib/fetcher'
 import { queueSeenIds } from '../../lib/offlineQueue'
 import { useSWRConfig } from 'swr'
-import { trackRead } from '../../lib/readTracker'
+import { trackRead, untrackRead } from '../../lib/readTracker'
 import { useArticleActions } from '../../hooks/use-article-actions'
 import { eventToKeyBindingToken } from '../../lib/keyboard-shortcuts'
 import { useI18n } from '../../lib/i18n'
@@ -85,6 +85,12 @@ export function ArticleDetail({ articleUrl, enableActionShortcuts = true }: Arti
         trackRead(article.id)
       }
       apiPost(`/api/articles/${article.id}/read`)
+        .then((result) => {
+          if (!isFirstSeen) return
+          const nextSeenAt = typeof result?.seen_at === 'string' ? result.seen_at : new Date().toISOString()
+          const nextReadAt = typeof result?.read_at === 'string' ? result.read_at : nextSeenAt
+          void mutate((current) => current ? { ...current, seen_at: nextSeenAt, read_at: nextReadAt } : current, false)
+        })
         .then(() => globalMutate((key: string) => typeof key === 'string' && key.startsWith('/api/feeds')))
         .catch(async () => {
           if (isFirstSeen) {
@@ -112,9 +118,11 @@ export function ArticleDetail({ articleUrl, enableActionShortcuts = true }: Arti
       if (!token) return
 
       if (token === keybindings.markRead) {
-        const markUnread = !!(currentArticle.read_at || currentArticle.seen_at)
+        const markUnread = !!(currentArticle.read_at || currentArticle.seen_at || viewedRef.current === currentArticle.id)
         const nextSeenAt = markUnread ? null : new Date().toISOString()
         const nextReadAt = markUnread ? null : nextSeenAt
+        if (markUnread) untrackRead(currentArticle.id)
+        else trackRead(currentArticle.id)
         void mutate({ ...currentArticle, seen_at: nextSeenAt, read_at: nextReadAt }, false)
         const request = markUnread
           ? apiPatch(`/api/articles/${currentArticle.id}/seen`, { seen: false })

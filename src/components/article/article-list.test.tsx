@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
 import { MemoryRouter, Routes, Route, Outlet } from 'react-router-dom'
 import { LocaleContext } from '../../lib/i18n'
+import { DEFAULT_KEY_BINDINGS } from '../../../shared/keyboard-shortcuts'
 import type { ArticleListItem } from '../../../shared/types'
 
 // --- Mocks ---
@@ -19,6 +20,12 @@ let swrInfiniteReturn: any = {
 
 // Control useSWR return value for /api/feeds
 let swrFeedsData: any = undefined
+let latestKeyboardNavigationOptions: any = null
+const mockApiPatch = vi.fn(() => Promise.resolve())
+const mockApiPost = vi.fn(() => Promise.resolve())
+const mockTrackRead = vi.fn()
+const mockUntrackRead = vi.fn()
+const mockIsReadInSession = vi.fn(() => false)
 
 vi.mock('swr/infinite', () => ({
   default: () => swrInfiniteReturn,
@@ -42,7 +49,8 @@ vi.mock('../feed/feed-metrics-bar', () => ({
 
 vi.mock('../../lib/fetcher', () => ({
   fetcher: vi.fn(),
-  apiPatch: vi.fn(() => Promise.resolve()),
+  apiPatch: (...args: any[]) => (mockApiPatch as any)(...args),
+  apiPost: (...args: any[]) => (mockApiPost as any)(...args),
 }))
 
 vi.mock('../../lib/markSeenWithQueue', () => ({
@@ -50,8 +58,9 @@ vi.mock('../../lib/markSeenWithQueue', () => ({
 }))
 
 vi.mock('../../lib/readTracker', () => ({
-  trackRead: vi.fn(),
-  isReadInSession: vi.fn(() => false),
+  trackRead: (...args: any[]) => (mockTrackRead as any)(...args),
+  untrackRead: (...args: any[]) => (mockUntrackRead as any)(...args),
+  isReadInSession: (...args: any[]) => (mockIsReadInSession as any)(...args),
 }))
 
 vi.mock('../../hooks/use-is-touch-device', () => ({
@@ -60,6 +69,12 @@ vi.mock('../../hooks/use-is-touch-device', () => ({
 
 vi.mock('../../hooks/use-clip-feed-id', () => ({
   useClipFeedId: vi.fn(() => null),
+}))
+
+vi.mock('../../hooks/use-keyboard-navigation', () => ({
+  useKeyboardNavigation: (options: any) => {
+    latestKeyboardNavigationOptions = options
+  },
 }))
 
 vi.mock('../layout/pull-to-refresh', () => ({
@@ -99,7 +114,9 @@ vi.mock('./article-card', () => ({
 }))
 
 vi.mock('./article-overlay', () => ({
-  ArticleOverlay: () => null,
+  ArticleOverlay: ({ articleUrl }: { articleUrl: string | null }) => (
+    articleUrl ? <div data-testid="article-overlay">{articleUrl}</div> : null
+  ),
 }))
 
 vi.mock('./article-detail', () => ({
@@ -161,6 +178,22 @@ const mockSettings = {
   setShowThumbnails: vi.fn(),
   showFeedActivity: 'on' as const,
   setShowFeedActivity: vi.fn(),
+  chatPosition: 'fab' as const,
+  setChatPosition: vi.fn(),
+  articleOpenMode: 'page' as const,
+  setArticleOpenMode: vi.fn(),
+  categoryUnreadOnly: 'off' as const,
+  setCategoryUnreadOnly: vi.fn(),
+  keyboardNavigation: 'on' as const,
+  setKeyboardNavigation: vi.fn(),
+  keybindings: DEFAULT_KEY_BINDINGS,
+  setKeybindings: vi.fn(),
+  layout: 'list' as const,
+  setLayout: vi.fn(),
+  mascot: 'off' as const,
+  setMascot: vi.fn(),
+  translateTargetLang: null as any,
+  setTranslateTargetLang: vi.fn(),
   highlightTheme: 'github-dark' as const,
   setHighlightTheme: vi.fn(),
   articleFont: 'sans' as const,
@@ -191,7 +224,13 @@ describe('ArticleList', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     swrFeedsData = undefined
+    latestKeyboardNavigationOptions = null
     mockSettings.autoMarkRead = 'off' as any
+    mockSettings.articleOpenMode = 'page' as any
+    mockSettings.keyboardNavigation = 'on' as any
+    mockSettings.keybindings = DEFAULT_KEY_BINDINGS as any
+    mockSettings.mascot = 'off' as any
+    mockIsReadInSession.mockReturnValue(false)
     // Stub IntersectionObserver for tests that enable autoMarkRead
     vi.stubGlobal('IntersectionObserver', class {
       constructor() {}
@@ -269,8 +308,61 @@ describe('ArticleList', () => {
     expect(screen.getByText('Second Article')).toBeTruthy()
   })
 
+  it('uses mark-unread when the focused article was already read in this session', async () => {
+    mockIsReadInSession.mockReturnValue(true)
+    swrInfiniteReturn = {
+      data: [{
+        articles: [makeArticle({ id: 1, title: 'Focused Article' })],
+        total: 1,
+        has_more: false,
+      }],
+      error: undefined,
+      size: 1,
+      setSize: vi.fn(),
+      isLoading: false,
+      isValidating: false,
+      mutate: vi.fn(),
+    }
+
+    renderArticleList()
+
+    latestKeyboardNavigationOptions.onMarkReadToggle('1')
+
+    expect(mockApiPatch).toHaveBeenCalledWith('/api/articles/1/seen', { seen: false })
+    expect(mockUntrackRead).toHaveBeenCalledWith(1)
+  })
+
+  it('updates the visible overlay article on skip-next in overlay mode', () => {
+    mockSettings.articleOpenMode = 'overlay' as any
+    swrInfiniteReturn = {
+      data: [{
+        articles: [
+          makeArticle({ id: 1, title: 'First Article', url: 'https://example.com/1' }),
+          makeArticle({ id: 2, title: 'Second Article', url: 'https://example.com/2' }),
+        ],
+        total: 2,
+        has_more: false,
+      }],
+      error: undefined,
+      size: 1,
+      setSize: vi.fn(),
+      isLoading: false,
+      isValidating: false,
+      mutate: vi.fn(),
+    }
+
+    renderArticleList()
+
+    act(() => {
+      latestKeyboardNavigationOptions.onFocusChange('2', 'skip')
+    })
+
+    expect(screen.getByTestId('article-overlay').textContent).toBe('https://example.com/2')
+  })
+
   it('shows mascot at end of feed', () => {
     mockSettings.autoMarkRead = 'on' as any
+    mockSettings.mascot = 'dream-puff' as any
     swrInfiniteReturn = {
       data: [{ articles: [makeArticle({ id: 1 })], total: 1, has_more: false }],
       error: undefined,
