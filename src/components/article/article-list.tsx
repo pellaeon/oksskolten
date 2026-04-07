@@ -23,6 +23,7 @@ import { Skeleton } from '../ui/skeleton'
 import { useKeyboardNavigationContext } from '../../contexts/keyboard-navigation-context'
 import { useKeyboardNavigation } from '../../hooks/use-keyboard-navigation'
 import { apiPatch, apiPost } from '../../lib/fetcher'
+import { persistArticlePageNavigation } from '../../lib/article-page-navigation'
 import type { ArticleListItem, FeedWithCounts } from '../../../shared/types'
 import type { LayoutName } from '../../data/layouts'
 
@@ -372,6 +373,17 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const isAutoMarkEnabled = autoMarkRead === 'on'
   const isTouchDevice = useIsTouchDevice()
   const listRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    persistArticlePageNavigation(
+      articles.length > 0
+        ? {
+            sourcePath: `${location.pathname}${location.search}`,
+            articleUrls: articles.map(article => article.url),
+          }
+        : null,
+    )
+  }, [articles, location.pathname, location.search])
 
   // Create the IntersectionObserver once when auto-mark is enabled.
   // The observer instance is kept stable — new article nodes from infinite

@@ -9,6 +9,7 @@ import { useSWRConfig } from 'swr'
 import { trackRead, untrackRead } from '../../lib/readTracker'
 import { useArticleActions } from '../../hooks/use-article-actions'
 import { eventToKeyBindingToken } from '../../lib/keyboard-shortcuts'
+import { getAdjacentArticleUrl, readArticlePageNavigation } from '../../lib/article-page-navigation'
 import { useI18n } from '../../lib/i18n'
 import { useRewriteInternalLinks } from '../../hooks/use-rewrite-internal-links'
 import { ImageLightbox } from '../ui/image-lightbox'
@@ -28,6 +29,7 @@ import { ArticleTranslationBanner } from './article-translation-banner'
 import { ArticleContentBody } from './article-content-body'
 import { ArticleSimilarBanner } from './article-similar-banner'
 import type { ArticleDetail as ArticleDetailData } from '../../../shared/types'
+import { articleUrlToPath } from '../../lib/url'
 
 interface ArticleDetailProps {
   articleUrl: string
@@ -114,7 +116,38 @@ export function ArticleDetail({ articleUrl, enableActionShortcuts = true }: Arti
         (typeof target.getAttribute === 'function' && target.getAttribute('contenteditable') === 'true')
       if (isInput) return
 
+      const openDialog = document.querySelector('[role="dialog"][data-state="open"]:not([data-keyboard-nav-passthrough])')
+      if (openDialog) return
+
       const token = eventToKeyBindingToken(e.key)
+      const pageNavigation = readArticlePageNavigation()
+
+      if (token === keybindings.next) {
+        const nextUrl = getAdjacentArticleUrl(currentArticle.url, 'next')
+        if (!nextUrl) return
+        e.preventDefault()
+        void navigate(articleUrlToPath(nextUrl))
+        return
+      }
+
+      if (token === keybindings.prev) {
+        const prevUrl = getAdjacentArticleUrl(currentArticle.url, 'prev')
+        if (!prevUrl) return
+        e.preventDefault()
+        void navigate(articleUrlToPath(prevUrl))
+        return
+      }
+
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        if (pageNavigation?.sourcePath) {
+          void navigate(pageNavigation.sourcePath)
+        } else {
+          navigate(-1)
+        }
+        return
+      }
+
       if (!token) return
 
       if (token === keybindings.markRead) {
@@ -166,7 +199,7 @@ export function ArticleDetail({ articleUrl, enableActionShortcuts = true }: Arti
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [article, enableActionShortcuts, globalMutate, keyboardNavigation, keybindings, mutate, toggleBookmark, toggleLike])
+  }, [article, enableActionShortcuts, globalMutate, keyboardNavigation, keybindings, mutate, navigate, toggleBookmark, toggleLike])
 
   const content = useMemo(() => {
     if (!article) return ''

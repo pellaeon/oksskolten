@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { MemoryRouter, Routes, Route, Outlet } from 'react-router-dom'
+import { MemoryRouter, Routes, Route, Outlet, useLocation, useParams } from 'react-router-dom'
 import { SWRConfig } from 'swr'
 import { LocaleContext } from '../../lib/i18n'
 import { TooltipProvider } from '../ui/tooltip'
 import { DEFAULT_KEY_BINDINGS } from '../../../shared/keyboard-shortcuts'
+import { persistArticlePageNavigation } from '../../lib/article-page-navigation'
+import { articleUrlToPath } from '../../lib/url'
 
 const { mockApiPatch, mockApiPost, mockTrackRead, mockUntrackRead, mockQueueSeenIds } = vi.hoisted(() => ({
   mockApiPatch: vi.fn(),
@@ -112,6 +114,18 @@ const mockSettings = {
 
 function OutletWrapper() {
   return <Outlet context={{ settings: mockSettings, sidebarOpen: false, setSidebarOpen: vi.fn() }} />
+}
+
+function RoutedArticleDetail() {
+  const { '*': splat } = useParams()
+  if (!splat) return null
+  const articleUrl = `https://${decodeURIComponent(splat)}`
+  return <ArticleDetail articleUrl={articleUrl} />
+}
+
+function PathnameProbe() {
+  const location = useLocation()
+  return <div data-testid="pathname">{location.pathname}</div>
 }
 
 describe('ArticleDetail bookmark', () => {
@@ -388,6 +402,7 @@ describe('ArticleDetail read shortcut', () => {
   const articleKey = `/api/articles/by-url?url=${encodeURIComponent(articleUrl)}`
 
   beforeEach(() => {
+    window.sessionStorage.clear()
     mockApiPatch.mockReset()
     mockApiPatch.mockResolvedValue({ seen_at: null, read_at: null })
     mockApiPost.mockReset()
@@ -439,6 +454,156 @@ describe('ArticleDetail read shortcut', () => {
 
     await waitFor(() => {
       expect(mockApiPatch).toHaveBeenCalledWith('/api/articles/1/seen', { seen: false })
+    })
+  })
+
+  it('navigates to the next article with J in full-page mode', async () => {
+    const nextUrl = 'https://example.com/posts/2'
+    const nextKey = `/api/articles/by-url?url=${encodeURIComponent(nextUrl)}`
+    const article = {
+      id: 1,
+      feed_id: 2,
+      feed_name: 'Example Feed',
+      title: 'Example Article',
+      url: articleUrl,
+      published_at: '2026-03-04T00:00:00.000Z',
+      lang: 'en',
+      summary: null,
+      full_text: 'Body',
+      full_text_translated: null,
+      translated_lang: null,
+      seen_at: '2026-03-04T00:00:00.000Z',
+      read_at: '2026-03-04T00:00:00.000Z',
+      bookmarked_at: null,
+      liked_at: null,
+    }
+    const nextArticle = { ...article, id: 2, url: nextUrl, title: 'Next Article' }
+
+    persistArticlePageNavigation({
+      sourcePath: '/inbox',
+      articleUrls: [articleUrl, nextUrl],
+    })
+
+    render(
+      <MemoryRouter initialEntries={[articleUrlToPath(articleUrl)]}>
+        <LocaleContext.Provider value={{ locale: 'en', setLocale: vi.fn() }}>
+          <TooltipProvider>
+            <SWRConfig value={{ provider: () => new Map(), fallback: { [articleKey]: article, [nextKey]: nextArticle } }}>
+              <Routes>
+                <Route element={<OutletWrapper />}>
+                  <Route path="/inbox" element={<PathnameProbe />} />
+                  <Route path="/*" element={<><RoutedArticleDetail /><PathnameProbe /></>} />
+                </Route>
+              </Routes>
+            </SWRConfig>
+          </TooltipProvider>
+        </LocaleContext.Provider>
+      </MemoryRouter>,
+    )
+
+    fireEvent.keyDown(document, { key: 'j' })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pathname').textContent).toBe(articleUrlToPath(nextUrl))
+    })
+  })
+
+  it('navigates to the previous article with K in full-page mode', async () => {
+    const prevUrl = 'https://example.com/posts/0'
+    const prevKey = `/api/articles/by-url?url=${encodeURIComponent(prevUrl)}`
+    const article = {
+      id: 1,
+      feed_id: 2,
+      feed_name: 'Example Feed',
+      title: 'Example Article',
+      url: articleUrl,
+      published_at: '2026-03-04T00:00:00.000Z',
+      lang: 'en',
+      summary: null,
+      full_text: 'Body',
+      full_text_translated: null,
+      translated_lang: null,
+      seen_at: '2026-03-04T00:00:00.000Z',
+      read_at: '2026-03-04T00:00:00.000Z',
+      bookmarked_at: null,
+      liked_at: null,
+    }
+    const prevArticle = { ...article, id: 3, url: prevUrl, title: 'Previous Article' }
+
+    persistArticlePageNavigation({
+      sourcePath: '/inbox',
+      articleUrls: [prevUrl, articleUrl],
+    })
+
+    render(
+      <MemoryRouter initialEntries={[articleUrlToPath(articleUrl)]}>
+        <LocaleContext.Provider value={{ locale: 'en', setLocale: vi.fn() }}>
+          <TooltipProvider>
+            <SWRConfig value={{ provider: () => new Map(), fallback: { [articleKey]: article, [prevKey]: prevArticle } }}>
+              <Routes>
+                <Route element={<OutletWrapper />}>
+                  <Route path="/inbox" element={<PathnameProbe />} />
+                  <Route path="/*" element={<><RoutedArticleDetail /><PathnameProbe /></>} />
+                </Route>
+              </Routes>
+            </SWRConfig>
+          </TooltipProvider>
+        </LocaleContext.Provider>
+      </MemoryRouter>,
+    )
+
+    fireEvent.keyDown(document, { key: 'k' })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pathname').textContent).toBe(articleUrlToPath(prevUrl))
+    })
+  })
+
+  it('returns to the source list with Escape in full-page mode', async () => {
+    const article = {
+      id: 1,
+      feed_id: 2,
+      feed_name: 'Example Feed',
+      title: 'Example Article',
+      url: articleUrl,
+      published_at: '2026-03-04T00:00:00.000Z',
+      lang: 'en',
+      summary: null,
+      full_text: 'Body',
+      full_text_translated: null,
+      translated_lang: null,
+      seen_at: '2026-03-04T00:00:00.000Z',
+      read_at: '2026-03-04T00:00:00.000Z',
+      bookmarked_at: null,
+      liked_at: null,
+    }
+
+    persistArticlePageNavigation({
+      sourcePath: '/inbox',
+      articleUrls: [articleUrl],
+    })
+
+    render(
+      <MemoryRouter initialEntries={[articleUrlToPath(articleUrl)]}>
+        <LocaleContext.Provider value={{ locale: 'en', setLocale: vi.fn() }}>
+          <TooltipProvider>
+            <SWRConfig value={{ provider: () => new Map(), fallback: { [articleKey]: article } }}>
+              <Routes>
+                <Route element={<OutletWrapper />}>
+                  <Route path="/inbox" element={<PathnameProbe />} />
+                  <Route path="/*" element={<><RoutedArticleDetail /><PathnameProbe /></>} />
+                </Route>
+              </Routes>
+            </SWRConfig>
+          </TooltipProvider>
+        </LocaleContext.Provider>
+      </MemoryRouter>,
+    )
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pathname').textContent).toBe('/inbox')
     })
   })
 })
