@@ -12,6 +12,8 @@ import {
   getCategories,
   getFeeds,
   getStats,
+  markCategoryAllSeen,
+  markFeedAllSeen,
   logout,
   recordRead,
   setBookmarked,
@@ -74,6 +76,10 @@ const clipFormUrl = ref('')
 const clipFormForce = ref(false)
 const clipConflict = ref<{ feedName: string } | null>(null)
 const categoryFormName = ref('')
+const showOnlyUnreadInList = ref(false)
+const articleFilterOpen = ref(false)
+const articleSearchQuery = ref('')
+const markingAllRead = ref(false)
 
 const deferredUnreadAutoReadIds = new Set<number>()
 const deferredUnreadManualReadIds = new Set<number>()
@@ -151,7 +157,6 @@ const currentLabel = computed(() => {
   return categories.value.find(category => category.id === selection.value.value)?.name ?? 'Category'
 })
 
-const currentCount = computed(() => totalArticles.value)
 const isUnreadMode = computed(() => selection.value.kind === 'filter' && selection.value.value === 'unread')
 const categoriesSorted = computed(() => [...categories.value].sort((a, b) => a.name.localeCompare(b.name)))
 const composeTitle = computed(() => {
@@ -187,6 +192,24 @@ const currentQuery = computed(() => {
   return { category_id: selection.value.value, limit: 100, no_floor: true }
 })
 
+function isMediaCandidate(article: ArticleListItem) {
+  const haystack = `${article.title ?? ''}\n${article.excerpt ?? ''}\n${article.summary ?? ''}`
+  return /<img\b|!\[[^\]]*\]\(|\.(png|jpe?g|gif|webp|svg)(\?|$)/i.test(haystack)
+}
+
+const displayedArticles = computed(() => {
+  const query = articleSearchQuery.value.trim().toLowerCase()
+  return articles.value.filter(article => {
+    if (showOnlyUnreadInList.value && article.seen_at != null) return false
+    if (selection.value.kind === 'filter' && selection.value.value === 'gallery' && !isMediaCandidate(article)) return false
+    if (!query) return true
+    const text = `${article.title ?? ''} ${article.excerpt ?? ''} ${article.summary ?? ''} ${article.feed_name ?? ''}`.toLowerCase()
+    return text.includes(query)
+  })
+})
+
+const currentCount = computed(() => displayedArticles.value.length)
+
 function showMessage(type: 'success' | 'error', text: string) {
   flashMessage.value = { type, text }
   window.setTimeout(() => {
@@ -195,12 +218,12 @@ function showMessage(type: 'success' | 'error', text: string) {
 }
 
 function moveSelection(delta: 1 | -1) {
-  if (articles.value.length === 0) return
-  const index = articles.value.findIndex(article => article.url === selectedArticleUrl.value)
+  if (displayedArticles.value.length === 0) return
+  const index = displayedArticles.value.findIndex(article => article.url === selectedArticleUrl.value)
   const nextIndex = index === -1
     ? 0
-    : Math.min(articles.value.length - 1, Math.max(0, index + delta))
-  selectedArticleUrl.value = articles.value[nextIndex]?.url ?? selectedArticleUrl.value
+    : Math.min(displayedArticles.value.length - 1, Math.max(0, index + delta))
+  selectedArticleUrl.value = displayedArticles.value[nextIndex]?.url ?? selectedArticleUrl.value
 }
 
 function handleKeyDown(event: KeyboardEvent) {
@@ -277,6 +300,13 @@ watch(selectedArticleUrl, async (url) => {
   }
   await loadDetail(url)
 })
+
+watch(displayedArticles, (next) => {
+  if (!selectedArticleUrl.value) return
+  if (!next.some(article => article.url === selectedArticleUrl.value)) {
+    selectedArticleUrl.value = next[0]?.url ?? null
+  }
+}, { deep: true })
 
 async function refreshSidebar(silent = false) {
   if (!silent) {
@@ -587,6 +617,30 @@ async function handleToggleBookmarked() {
   await loadArticles()
 }
 
+async function handleMarkAllAsRead() {
+  if (markingAllRead.value) return
+  markingAllRead.value = true
+  try {
+    if (selection.value.kind === 'feed') {
+      await markFeedAllSeen(selection.value.value)
+    } else if (selection.value.kind === 'category') {
+      await markCategoryAllSeen(selection.value.value)
+    } else {
+      const targets = articles.value.filter(article => article.seen_at == null).map(article => article.id)
+      await Promise.all(targets.map(id => recordRead(id)))
+    }
+    deferredUnreadAutoReadIds.clear()
+    deferredUnreadManualReadIds.clear()
+    await refreshSidebar(true)
+    await loadArticles()
+    showMessage('success', 'Marked as read')
+  } catch (error) {
+    showMessage('error', error instanceof Error ? error.message : 'Failed to mark as read')
+  } finally {
+    markingAllRead.value = false
+  }
+}
+
 async function handleSummarize() {
   if (!selectedArticle.value || summarizing.value) return
   summarizing.value = true
@@ -871,7 +925,26 @@ function faviconUrl(rawUrl: string) {
         <div class="pane-title">
           <h2>{{ currentLabel }}</h2>
         </div>
-        <div class="pane-actions">
+        <div class="pane-actions pane-actions--article-controls">
+          <button class="sidebar-header__button" type="button" :disabled="markingAllRead" @click="handleMarkAllAsRead">
+            {{ markingAllRead ? 'Marking…' : 'Mark All as Read' }}
+          </button>
+          <button
+            class="sidebar-header__button"
+            type="button"
+            :class="{ 'is-active': showOnlyUnreadInList }"
+            @click="showOnlyUnreadInList = !showOnlyUnreadInList"
+          >
+            Show only unread articles
+          </button>
+          <button
+            class="sidebar-header__button"
+            type="button"
+            :class="{ 'is-active': articleFilterOpen }"
+            @click="articleFilterOpen = !articleFilterOpen"
+          >
+            Filter
+          </button>
           <span class="articles-pane__count">{{ currentCount }}</span>
           <button class="pane-icon-button" type="button" title="Refresh" @click="loadArticles">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -881,6 +954,9 @@ function faviconUrl(rawUrl: string) {
           </button>
         </div>
       </header>
+      <div v-if="articleFilterOpen" class="articles-pane__filter-row">
+        <input v-model="articleSearchQuery" type="text" placeholder="Filter articles..." />
+      </div>
 
       <p v-if="flashMessage" class="settings-message" :class="{ 'is-error': flashMessage.type === 'error' }">
         {{ flashMessage.text }}
@@ -889,9 +965,9 @@ function faviconUrl(rawUrl: string) {
       <div class="articles-pane__list">
         <div v-if="articleError" class="pane-flat-state pane-flat-state--error">{{ articleError }}</div>
         <div v-else-if="articleLoading" class="pane-flat-state">Loading articles…</div>
-        <div v-else-if="articles.length === 0" class="pane-flat-state">No articles found.</div>
+        <div v-else-if="displayedArticles.length === 0" class="pane-flat-state">No articles found.</div>
         <button
-          v-for="article in articles"
+          v-for="article in displayedArticles"
           :key="article.id"
           class="article-row"
           :class="{ 'is-active': selectedArticleUrl === article.url, 'is-unread': !article.seen_at }"

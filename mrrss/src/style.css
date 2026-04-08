@@ -336,6 +336,11 @@ a {
   gap: 6px;
 }
 
+.pane-actions--article-controls {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .articles-pane__count {
   font-size: 13px;
   color: var(--text-muted);
@@ -356,6 +361,29 @@ a {
   color: #4d5867;
   background: #fafbfd;
   outline: none;
+}
+
+.articles-pane__filter-row {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.articles-pane__filter-row input {
+  width: 100%;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 9px;
+  font-size: 13px;
+  color: #4d5867;
+  background: #fafbfd;
+  outline: none;
+}
+
+.sidebar-header__button.is-active {
+  background: var(--accent-soft);
+  border-color: rgba(31, 122, 240, 0.25);
+  color: var(--accent);
 }
 
 .feeds-tree {
