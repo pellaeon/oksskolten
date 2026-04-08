@@ -794,7 +794,7 @@ function faviconUrl(rawUrl: string) {
           <svg v-else-if="filterIconName(filter.key) === 'inbox'" viewBox="0 0 24 24" aria-hidden="true">
             <template v-if="isFilterActive(filter.key)">
               <path d="M4 5h16v12H4z" fill="currentColor" />
-              <path d="M4 14h4l2 3h4l2-3h4" fill="none" stroke="#ffffff" stroke-width="1.8" />
+              <path d="M4 14h4l2 3h4l2-3h4v2H4z" fill="currentColor" />
             </template>
             <template v-else>
               <path d="M4 5h16v12H4z" fill="none" stroke="currentColor" stroke-width="1.8" />
@@ -812,8 +812,7 @@ function faviconUrl(rawUrl: string) {
           <svg v-else-if="filterIconName(filter.key) === 'bookmark'" viewBox="0 0 24 24" aria-hidden="true">
             <template v-if="isFilterActive(filter.key)">
               <circle cx="12" cy="12" r="8" fill="currentColor" />
-              <path d="M12 7v5l-3 2" fill="none" stroke="#ffffff" stroke-width="1.8" />
-              <path d="M6.6 9.6A7.9 7.9 0 0 1 12 4" fill="none" stroke="#ffffff" stroke-width="1.8" />
+              <circle cx="12" cy="12" r="4.2" fill="#ffffff" opacity="0.28" />
             </template>
             <template v-else>
               <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8" />
@@ -824,8 +823,7 @@ function faviconUrl(rawUrl: string) {
           <svg v-else-if="filterIconName(filter.key) === 'clock'" viewBox="0 0 24 24" aria-hidden="true">
             <template v-if="isFilterActive(filter.key)">
               <circle cx="12" cy="12" r="8" fill="currentColor" />
-              <path d="M12 8v5l3 2" fill="none" stroke="#ffffff" stroke-width="1.8" />
-              <circle cx="18.4" cy="7.2" r="1.2" fill="#ffffff" />
+              <circle cx="18.4" cy="7.2" r="1.2" fill="currentColor" />
             </template>
             <template v-else>
               <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8" />
@@ -836,8 +834,7 @@ function faviconUrl(rawUrl: string) {
           <svg v-else-if="filterIconName(filter.key) === 'gallery'" viewBox="0 0 24 24" aria-hidden="true">
             <template v-if="isFilterActive(filter.key)">
               <rect x="4" y="5" width="16" height="14" rx="1.5" fill="currentColor" />
-              <path d="M8 14l2.5-2.5 2.5 2.5 3-3L20 14" fill="none" stroke="#ffffff" stroke-width="1.8" />
-              <circle cx="9" cy="9" r="1.4" fill="#ffffff" />
+              <path d="M8 14l2.5-2.5 2.5 2.5 3-3L20 14v5H4v-3z" fill="currentColor" />
             </template>
             <template v-else>
               <rect x="4" y="5" width="16" height="14" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8" />
@@ -848,7 +845,7 @@ function faviconUrl(rawUrl: string) {
           <svg v-else viewBox="0 0 24 24" aria-hidden="true">
             <template v-if="isFilterActive(filter.key)">
               <rect x="5" y="6" width="12" height="12" rx="1.5" fill="currentColor" />
-              <path d="M17 10h2.5a1.5 1.5 0 0 1 0 3H17" fill="none" stroke="#ffffff" stroke-width="1.8" />
+              <path d="M17 10h2.5a1.5 1.5 0 0 1 0 3H17z" fill="currentColor" />
             </template>
             <template v-else>
               <rect x="5" y="6" width="12" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8" />
@@ -933,11 +930,6 @@ function faviconUrl(rawUrl: string) {
                 d="M240,56v48a8,8,0,0,1-8,8H184a8,8,0,0,1,0-16H211.4L184.81,71.64l-.25-.24a80,80,0,1,0-1.67,114.78,8,8,0,0,1,11,11.63A95.44,95.44,0,0,1,128,224h-1.32A96,96,0,1,1,195.75,60L224,85.8V56a8,8,0,1,1,16,0Z"
                 fill="currentColor"
               />
-            </svg>
-          </button>
-          <button class="pane-icon-button" type="button" title="Close" @click="toggleFeedList">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M7 7l10 10M17 7L7 17" fill="none" stroke="currentColor" stroke-width="1.8" />
             </svg>
           </button>
         </div>
