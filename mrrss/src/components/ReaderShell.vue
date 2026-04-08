@@ -217,7 +217,6 @@ const displayedArticles = computed(() => {
   })
 })
 
-const currentCount = computed(() => displayedArticles.value.length)
 const isGalleryMode = computed(() => selection.value.kind === 'filter' && selection.value.value === 'gallery')
 
 function showMessage(type: 'success' | 'error', text: string) {
@@ -943,22 +942,34 @@ function faviconUrl(rawUrl: string) {
             {{ markingAllRead ? 'Marking…' : 'Mark All as Read' }}
           </button>
           <button
-            class="sidebar-header__button"
+            class="pane-icon-button"
             type="button"
+            title="Show only unread articles"
+            aria-label="Show only unread articles"
             :class="{ 'is-active': showOnlyUnreadInList }"
             @click="showOnlyUnreadInList = !showOnlyUnreadInList"
           >
-            Show only unread articles
+            <svg v-if="showOnlyUnreadInList" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z" fill="none" stroke="currentColor" stroke-width="1.8" />
+              <circle cx="12" cy="12" r="2.8" fill="none" stroke="currentColor" stroke-width="1.8" />
+            </svg>
+            <svg v-else viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z" fill="none" stroke="currentColor" stroke-width="1.8" />
+              <path d="M4 4l16 16" fill="none" stroke="currentColor" stroke-width="1.8" />
+            </svg>
           </button>
           <button
-            class="sidebar-header__button"
+            class="pane-icon-button"
             type="button"
+            title="Filter"
+            aria-label="Filter"
             :class="{ 'is-active': articleFilterOpen }"
             @click="articleFilterOpen = !articleFilterOpen"
           >
-            Filter
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 6h16M7 12h10M10 18h4" fill="none" stroke="currentColor" stroke-width="1.8" />
+            </svg>
           </button>
-          <span class="articles-pane__count">{{ currentCount }}</span>
           <button class="pane-icon-button" type="button" title="Refresh" @click="loadArticles">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M20 6v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" />

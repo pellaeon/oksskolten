@@ -241,6 +241,7 @@ a {
   place-items: center;
   border-radius: 6px;
   position: relative;
+  transition: color 120ms ease, background-color 120ms ease, transform 120ms ease;
 }
 
 .pane-icon-button {
@@ -253,6 +254,7 @@ a {
   display: grid;
   place-items: center;
   border-radius: 6px;
+  transition: color 120ms ease, background-color 120ms ease, transform 120ms ease;
 }
 
 .mode-rail__button svg {
@@ -285,6 +287,17 @@ a {
 .mode-rail__button.is-active {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+.mode-rail__button:hover,
+.pane-icon-button:hover {
+  color: var(--accent);
+  background: #eef3fa;
+}
+
+.mode-rail__button:hover svg,
+.pane-icon-button:hover svg {
+  transform: scale(1.03);
 }
 
 .mode-rail__badge {
@@ -356,7 +369,7 @@ a {
 }
 
 .pane-actions--article-controls {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
 }
 
@@ -405,6 +418,11 @@ a {
   color: var(--accent);
 }
 
+.pane-icon-button.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .feeds-tree {
   flex: 1;
   min-height: 0;
@@ -436,6 +454,7 @@ a {
   padding: 6px 10px;
   font-size: 13px;
   color: #54606f;
+  transition: background-color 120ms ease, color 120ms ease;
 }
 
 .tree-feed {
@@ -461,6 +480,12 @@ a {
 .tree-feed.is-active {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+.tree-category:hover,
+.tree-feed:hover {
+  background: #f4f7fb;
+  color: #3f4b5b;
 }
 
 .tree-label {
@@ -495,6 +520,7 @@ a {
   background: transparent;
   padding: 10px 12px 10px 14px;
   text-align: left;
+  transition: background-color 120ms ease, border-color 120ms ease;
 }
 
 .gallery-grid {
@@ -513,11 +539,17 @@ a {
   text-align: left;
   display: grid;
   grid-template-rows: 120px auto;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
 }
 
 .gallery-card.is-active {
   border-color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--accent-soft);
+}
+
+.gallery-card:hover {
+  border-color: #c8d5e7;
+  transform: translateY(-1px);
 }
 
 .gallery-card__image {
@@ -558,6 +590,10 @@ a {
 
 .article-row.is-unread h3 {
   font-weight: 700;
+}
+
+.article-row:hover {
+  background: #fbfcff;
 }
 
 .article-row__meta,
@@ -656,6 +692,13 @@ a {
   background: var(--success-soft);
   border-color: #cfe5d4;
   color: #2e7254;
+}
+
+.sidebar-header__button:hover,
+.detail-action:hover {
+  background: #eef3fa;
+  color: #3f4b5b;
+  border-color: #d0d9e6;
 }
 
 .detail-action--link {
