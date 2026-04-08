@@ -61,15 +61,15 @@ const emit = defineEmits<{
 
 type SettingsTab = 'general' | 'appearance' | 'ai' | 'integration' | 'plugins' | 'security' | 'data' | 'about'
 
-const tabs: Array<{ key: SettingsTab; label: string }> = [
-  { key: 'general', label: 'General' },
-  { key: 'appearance', label: 'Appearance' },
-  { key: 'ai', label: 'AI & Translation' },
-  { key: 'integration', label: 'Integration' },
-  { key: 'plugins', label: 'Plugins' },
-  { key: 'security', label: 'Security' },
-  { key: 'data', label: 'Data' },
-  { key: 'about', label: 'About' },
+const tabs: Array<{ key: SettingsTab; label: string; icon: string }> = [
+  { key: 'general', label: 'General', icon: 'M4 7h16M4 12h16M4 17h16' },
+  { key: 'appearance', label: 'Appearance', icon: 'M12 4a8 8 0 1 0 8 8h-8V4Z M12 4a8 8 0 0 1 8 8' },
+  { key: 'ai', label: 'AI & Translation', icon: 'M12 3 4 8v8l8 5 8-5V8l-8-5Z' },
+  { key: 'integration', label: 'Integration', icon: 'M8 12h8M12 8v8M4 12a8 8 0 0 0 8 8M20 12a8 8 0 0 1-8 8M4 12a8 8 0 0 1 8-8M20 12a8 8 0 0 0-8-8' },
+  { key: 'plugins', label: 'Plugins', icon: 'M8 4h4v4H8zM12 8h4v4h-4zM8 12h4v4H8zM12 16h4v4h-4z' },
+  { key: 'security', label: 'Security', icon: 'M12 3 5 6v6c0 5 3.2 7.7 7 9 3.8-1.3 7-4 7-9V6l-7-3Z' },
+  { key: 'data', label: 'Data', icon: 'M4 7c0-2 3.6-3 8-3s8 1 8 3-3.6 3-8 3-8-1-8-3Zm0 5c0 2 3.6 3 8 3s8-1 8-3m-16 0v5c0 2 3.6 3 8 3s8-1 8-3v-5' },
+  { key: 'about', label: 'About', icon: 'M12 17v-5M12 8h.01M4 12a8 8 0 1 0 16 0 8 8 0 0 0-16 0' },
 ]
 
 const activeTab = ref<SettingsTab>('general')
@@ -662,9 +662,14 @@ watch(() => prefs['translate.provider'], (provider) => {
       <header class="settings-sheet__header">
         <div>
           <p class="pane-header__eyebrow">Settings</p>
-          <h2>Oksskolten Options</h2>
+          <h2>
+            <svg class="settings-sheet__title-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M10 3h4l.5 2.2a7.7 7.7 0 0 1 1.8.8l2-1.2 2.8 2.8-1.2 2a7.7 7.7 0 0 1 .8 1.8L23 12v4l-2.2.5a7.7 7.7 0 0 1-.8 1.8l1.2 2-2.8 2.8-2-1.2a7.7 7.7 0 0 1-1.8.8L14 23h-4l-.5-2.2a7.7 7.7 0 0 1-1.8-.8l-2 1.2-2.8-2.8 1.2-2a7.7 7.7 0 0 1-.8-1.8L1 16v-4l2.2-.5a7.7 7.7 0 0 1 .8-1.8l-1.2-2 2.8-2.8 2 1.2a7.7 7.7 0 0 1 1.8-.8L10 3Z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z" fill="currentColor" />
+            </svg>
+            Oksskolten Options
+          </h2>
         </div>
-        <button class="sidebar-header__button" type="button" @click="close">Close</button>
+        <button class="settings-close" type="button" @click="close" aria-label="Close settings">×</button>
       </header>
 
       <div v-if="loading" class="pane-state">Loading settings…</div>
@@ -678,6 +683,9 @@ watch(() => prefs['translate.provider'], (provider) => {
             :class="{ 'is-active': activeTab === tab.key }"
             @click="activeTab = tab.key"
           >
+            <svg class="settings-nav__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path :d="tab.icon" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
             {{ tab.label }}
           </button>
         </nav>
