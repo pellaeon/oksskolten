@@ -251,8 +251,9 @@ a {
   padding: 0;
   background: transparent;
   color: #748190;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 6px;
   transition: color 120ms ease, background-color 120ms ease, transform 120ms ease;
 }
@@ -374,6 +375,15 @@ a {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-height: 28px;
+}
+
+.feeds-pane__header .pane-icon-button svg,
+.articles-pane__header .pane-icon-button svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex: 0 0 16px;
 }
 
 .pane-actions--article-controls {
