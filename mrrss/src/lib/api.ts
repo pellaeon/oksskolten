@@ -356,6 +356,18 @@ export function setLiked(articleId: number, liked: boolean) {
   })
 }
 
+export function markFeedAllSeen(feedId: number) {
+  return request<{ updated: number }>(`/api/feeds/${feedId}/mark-all-seen`, {
+    method: 'POST',
+  })
+}
+
+export function markCategoryAllSeen(categoryId: number) {
+  return request<{ updated: number }>(`/api/categories/${categoryId}/mark-all-seen`, {
+    method: 'POST',
+  })
+}
+
 export function summarizeArticle(articleId: number) {
   return request<{ text: string }>(`/api/articles/${articleId}/summarize`, {
     method: 'POST',

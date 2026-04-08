@@ -24,7 +24,7 @@ import {
 import ArticleDetailPane from './ArticleDetailPane.vue'
 import SettingsPanel from './SettingsPanel.vue'
 
-type FilterMode = 'all' | 'unread' | 'liked' | 'bookmarked' | 'read' | 'clips'
+type FilterMode = 'all' | 'unread' | 'liked' | 'bookmarked' | 'read' | 'gallery' | 'clips'
 type Selection =
   | { kind: 'filter'; value: FilterMode }
   | { kind: 'feed'; value: number }
@@ -61,6 +61,8 @@ const archiving = ref(false)
 const flashMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
 const feedSearchQuery = ref('')
 const addMenuOpen = ref(false)
+const activityBarCollapsed = ref(false)
+const feedListExpanded = ref(true)
 const composeOpen = ref(false)
 const composeMode = ref<ComposeMode>('feed')
 const composeLoading = ref(false)
@@ -82,6 +84,7 @@ const globalFilters = computed(() => [
   { key: 'liked' as const, label: 'Liked', count: stats.value?.liked_articles ?? 0 },
   { key: 'bookmarked' as const, label: 'Read Later', count: stats.value?.bookmarked_articles ?? 0 },
   { key: 'read' as const, label: 'Read', count: stats.value?.read_articles ?? 0 },
+  { key: 'gallery' as const, label: 'Multimedia Gallery', count: 0 },
   {
     key: 'clips' as const,
     label: 'Clips',
@@ -168,6 +171,8 @@ const currentQuery = computed(() => {
         return { bookmarked: true, limit: 100 }
       case 'read':
         return { read: true, limit: 100 }
+      case 'gallery':
+        return { limit: 100 }
       case 'clips':
         return clipFeedId.value != null ? { feed_id: clipFeedId.value, limit: 100, no_floor: true } : { limit: 100 }
       default:
@@ -250,6 +255,9 @@ function handleKeyDown(event: KeyboardEvent) {
 }
 
 onMounted(async () => {
+  activityBarCollapsed.value = localStorage.getItem('mrrss.activity-collapsed') === 'true'
+  const storedFeedExpanded = localStorage.getItem('mrrss.feed-expanded')
+  feedListExpanded.value = storedFeedExpanded == null ? true : storedFeedExpanded === 'true'
   await refreshSidebar()
   window.addEventListener('keydown', handleKeyDown)
 })
@@ -638,6 +646,16 @@ async function handleLogout() {
   emit('logout')
 }
 
+function toggleFeedList() {
+  feedListExpanded.value = !feedListExpanded.value
+  localStorage.setItem('mrrss.feed-expanded', String(feedListExpanded.value))
+}
+
+function toggleActivityBar() {
+  activityBarCollapsed.value = !activityBarCollapsed.value
+  localStorage.setItem('mrrss.activity-collapsed', String(activityBarCollapsed.value))
+}
+
 function filterIconName(filter: FilterMode) {
   switch (filter) {
     case 'all': return 'grid'
@@ -645,6 +663,7 @@ function filterIconName(filter: FilterMode) {
     case 'liked': return 'star'
     case 'bookmarked': return 'bookmark'
     case 'read': return 'clock'
+    case 'gallery': return 'gallery'
     case 'clips': return 'clip'
   }
 }
@@ -660,8 +679,26 @@ function faviconUrl(rawUrl: string) {
 </script>
 
 <template>
-  <div class="reader-shell">
-    <nav class="mode-rail">
+  <div
+    class="reader-shell"
+    :class="{
+      'reader-shell--activity-collapsed': activityBarCollapsed,
+      'reader-shell--feed-collapsed': !feedListExpanded,
+    }"
+  >
+    <nav class="mode-rail" :class="{ 'is-collapsed': activityBarCollapsed }">
+      <button
+        v-if="activityBarCollapsed"
+        class="mode-rail__edge-toggle"
+        type="button"
+        title="Expand Activity Bar"
+        @click="toggleActivityBar"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" />
+        </svg>
+      </button>
+      <template v-else>
       <div class="mode-rail__top">
         <div class="mode-rail__brand">N</div>
         <button
@@ -692,6 +729,11 @@ function faviconUrl(rawUrl: string) {
           <svg v-else-if="filterIconName(filter.key) === 'clock'" viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8" />
             <path d="M12 8v5l3 2" fill="none" stroke="currentColor" stroke-width="1.8" />
+          </svg>
+          <svg v-else-if="filterIconName(filter.key) === 'gallery'" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="5" width="16" height="14" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path d="M8 14l2.5-2.5 2.5 2.5 3-3L20 14" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <circle cx="9" cy="9" r="1.4" fill="currentColor" />
           </svg>
           <svg v-else viewBox="0 0 24 24" aria-hidden="true">
             <rect x="5" y="6" width="12" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8" />
@@ -726,10 +768,26 @@ function faviconUrl(rawUrl: string) {
             <path d="M9 12h8" fill="none" stroke="currentColor" stroke-width="1.8" />
           </svg>
         </button>
+        <button
+          class="mode-rail__button"
+          type="button"
+          :title="feedListExpanded ? 'Collapse Feed List' : 'Expand Feed List'"
+          @click="toggleFeedList"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 6h14M5 12h14M5 18h14" fill="none" stroke="currentColor" stroke-width="1.8" />
+          </svg>
+        </button>
+        <button class="mode-rail__button" type="button" title="Collapse Activity Bar" @click="toggleActivityBar">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.8" />
+          </svg>
+        </button>
       </div>
+      </template>
     </nav>
 
-    <aside class="feeds-pane">
+    <aside v-if="feedListExpanded" class="feeds-pane">
       <header class="feeds-pane__header">
         <div class="pane-title">
           <h2>Feeds</h2>
@@ -739,6 +797,11 @@ function faviconUrl(rawUrl: string) {
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M20 6v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" />
               <path d="M20 11a8 8 0 1 0 2 5.3" fill="none" stroke="currentColor" stroke-width="1.8" />
+            </svg>
+          </button>
+          <button class="pane-icon-button" type="button" title="Close" @click="toggleFeedList">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 7l10 10M17 7L7 17" fill="none" stroke="currentColor" stroke-width="1.8" />
             </svg>
           </button>
         </div>
