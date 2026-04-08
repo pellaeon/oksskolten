@@ -36,6 +36,7 @@ const json = { 'content-type': 'application/json' }
 
 beforeEach(async () => {
   setupTestDb()
+  vi.unstubAllGlobals()
   app = await buildApp()
 })
 
@@ -322,6 +323,18 @@ describe('POST /api/settings/preferences', () => {
     expect(res.json()['reading.date_mode']).toBe('absolute')
   })
 
+  it('stores OpenAI base URL via preferences', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'openai.base_url': 'https://openrouter.ai/api/v1' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()['openai.base_url']).toBe('https://openrouter.ai/api/v1')
+    expect(getSetting('openai.base_url')).toBe('https://openrouter.ai/api/v1')
+  })
+
   it('validates provider-model consistency via POST', async () => {
     const res = await app.inject({
       method: 'POST',
@@ -589,6 +602,50 @@ describe('POST /api/settings/api-keys/:provider', () => {
       payload: { apiKey: 'key' },
     })
     expect(res.statusCode).toBe(400)
+  })
+})
+
+describe('GET /api/settings/openai/status', () => {
+  it('returns connection details for configured custom OpenAI URL', async () => {
+    upsertSetting('api_key.openai', 'sk-test')
+    upsertSetting('openai.base_url', 'https://openrouter.ai/api/v1')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ id: 'gpt-4.1-mini' }, { id: 'gpt-5-nano' }] }),
+    }))
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/settings/openai/status',
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({
+      ok: true,
+      model_count: 2,
+      first_model: 'gpt-4.1-mini',
+    })
+    expect(fetch).toHaveBeenCalledWith('https://openrouter.ai/api/v1/models', expect.objectContaining({
+      headers: expect.objectContaining({
+        Authorization: 'Bearer sk-test',
+        Accept: 'application/json',
+      }),
+    }))
+  })
+
+  it('returns an error when custom URL is not configured', async () => {
+    upsertSetting('api_key.openai', 'sk-test')
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/settings/openai/status',
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({
+      ok: false,
+      error: 'OpenAI base URL is not configured',
+    })
   })
 })
 

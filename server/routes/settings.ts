@@ -52,6 +52,7 @@ const PREF_KEYS = [
   'translate.provider',
   'translate.model',
   'translate.target_lang',
+  'openai.base_url',
   'ollama.base_url',
   'ollama.custom_headers',
   'custom_themes',
@@ -86,6 +87,7 @@ const PREF_ALLOWED: Record<PrefKey, string[] | null> = {
   'translate.provider': ['anthropic', 'gemini', 'openai', 'claude-code', 'ollama', 'google-translate', 'deepl'],
   'translate.model': getAllModelValues(),
   'translate.target_lang': ['ja', 'en'],
+  'openai.base_url': null,
   'ollama.base_url': null,
   'ollama.custom_headers': null,
   'custom_themes': null,
@@ -634,6 +636,44 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
         ok: true,
         version: versionData.version || 'unknown',
         model_count: tagsData.models?.length || 0,
+      })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Connection failed'
+      reply.send({ ok: false, error: message })
+    }
+  })
+
+  api.get('/api/settings/openai/status', async (_request, reply) => {
+    const baseUrl = (getSetting('openai.base_url') || '').trim()
+    const apiKey = (getSetting('api_key.openai') || '').trim()
+
+    if (!baseUrl) {
+      reply.send({ ok: false, error: 'OpenAI base URL is not configured' })
+      return
+    }
+    if (!apiKey) {
+      reply.send({ ok: false, error: 'OpenAI API key is not configured' })
+      return
+    }
+
+    try {
+      const modelsUrl = new URL('./models', baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`).toString()
+      const res = await fetch(modelsUrl, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          Accept: 'application/json',
+        },
+        signal: AbortSignal.timeout(5_000),
+      })
+      if (!res.ok) {
+        reply.send({ ok: false, error: `HTTP ${res.status}` })
+        return
+      }
+      const data = await res.json() as { data?: Array<{ id?: string }> }
+      reply.send({
+        ok: true,
+        model_count: data.data?.length || 0,
+        first_model: data.data?.[0]?.id || null,
       })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Connection failed'

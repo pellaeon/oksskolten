@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { FormField } from '@/components/ui/form-field'
 import { ExternalLink, CircleDot, CircleCheck, CircleSlash } from 'lucide-react'
 import type { Settings } from '../../../hooks/use-settings'
+import { isMessageKey } from '../../../lib/i18n'
 
 type TFunc = (key: any, params?: Record<string, string>) => string
 
@@ -66,10 +67,30 @@ function ApiProviderCard({ provider, t }: { provider: string; t: TFunc }) {
     fetcher,
     { revalidateOnFocus: false },
   )
+  const { data: prefs, mutate: mutatePrefs } = useSWR<Record<string, string | null>>(
+    provider === 'openai' ? '/api/settings/preferences' : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  )
 
   const [apiKeyInput, setApiKeyInput] = useState('')
+  const [baseUrlInput, setBaseUrlInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+  const [initialized, setInitialized] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; model_count?: number; first_model?: string | null; error?: string } | null>(null)
+
+  useEffect(() => {
+    if (provider !== 'openai' || !prefs || initialized) return
+    setBaseUrlInput(prefs['openai.base_url'] || '')
+    setInitialized(true)
+  }, [initialized, prefs, provider])
+
+  useEffect(() => {
+    if (provider !== 'openai') return
+    setTestResult(null)
+  }, [provider, baseUrlInput])
 
   function showMessage(text: string, type: 'success' | 'error') {
     setMessage({ text, type })
@@ -87,20 +108,32 @@ function ApiProviderCard({ provider, t }: { provider: string; t: TFunc }) {
     : provider === 'google-translate' ? t('googleTranslate.apiKeyDeleted')
     : provider === 'deepl' ? t('deepl.apiKeyDeleted')
     : t('chat.apiKeyDeleted')
+  const baseUrlSavedMsg = provider === 'openai' ? t('openai.apiUrlSaved') : t('settings.saved')
   const placeholder = provider === 'gemini' ? 'AIza...'
     : provider === 'openai' ? 'sk-...'
     : provider === 'google-translate' ? 'AIza...'
     : provider === 'deepl' ? '...'
     : 'sk-ant-...'
+  const savedBaseUrl = provider === 'openai' ? (prefs?.['openai.base_url'] || '') : ''
+  const hasBaseUrlChanges = provider === 'openai' && baseUrlInput !== savedBaseUrl
+  const hasApiKeyChanges = apiKeyInput.trim().length > 0
+  const canTestOpenAI = provider === 'openai' && !!savedBaseUrl && !hasBaseUrlChanges
 
   async function handleSave() {
     if (saving) return
+    if (!hasApiKeyChanges && !hasBaseUrlChanges) return
     setSaving(true)
     try {
-      await apiPost(endpoint, { apiKey: apiKeyInput })
-      void mutateKeyStatus()
-      setApiKeyInput('')
-      showMessage(savedMsg, 'success')
+      if (hasApiKeyChanges) {
+        await apiPost(endpoint, { apiKey: apiKeyInput })
+        void mutateKeyStatus()
+        setApiKeyInput('')
+      }
+      if (hasBaseUrlChanges) {
+        await apiPatch('/api/settings/preferences', { 'openai.base_url': baseUrlInput || '' })
+        void mutatePrefs()
+      }
+      showMessage(hasApiKeyChanges ? savedMsg : baseUrlSavedMsg, 'success')
     } catch (err: unknown) {
       showMessage(err instanceof Error ? err.message : 'Save failed', 'error')
     } finally {
@@ -123,14 +156,35 @@ function ApiProviderCard({ provider, t }: { provider: string; t: TFunc }) {
     }
   }
 
+  async function handleTest() {
+    if (provider !== 'openai' || testing) return
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const res = await fetcher('/api/settings/openai/status') as {
+        ok: boolean
+        model_count?: number
+        first_model?: string | null
+        error?: string
+      }
+      setTestResult(res)
+    } catch (err: unknown) {
+      setTestResult({ ok: false, error: err instanceof Error ? err.message : 'Request failed' })
+    } finally {
+      setTesting(false)
+    }
+  }
+
   const isConfigured = keyStatus?.configured
+  const providerLabelKey = PROVIDER_LABELS[provider]
+  const providerLabel = providerLabelKey && isMessageKey(providerLabelKey) ? t(providerLabelKey) : provider
 
   return (
     <div className="p-3 rounded-lg bg-bg-card border border-border space-y-2 min-h-[3rem]">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full shrink-0 ${isConfigured ? 'bg-success' : 'bg-error'}`} />
-          <span className="text-sm font-medium text-text select-none">{t(PROVIDER_LABELS[provider])}</span>
+          <span className="text-sm font-medium text-text select-none">{providerLabel}</span>
           <span className="text-xs text-muted select-none">
             {isConfigured ? t('chat.apiKeyConfigured') : t('chat.apiKeyNotSet')}
           </span>
@@ -169,6 +223,50 @@ function ApiProviderCard({ provider, t }: { provider: string; t: TFunc }) {
           )}
           </div>
         </FormField>
+      )}
+
+      {provider === 'openai' && (
+        <FormField label={t('openai.apiUrl')} hint={t('openai.apiUrlDesc')} compact>
+          <div className="flex items-center gap-2">
+            <Input
+              type="text"
+              value={baseUrlInput}
+              onChange={e => setBaseUrlInput(e.target.value)}
+              placeholder={t('openai.apiUrlPlaceholder')}
+              className="flex-1 py-1.5"
+            />
+            {hasBaseUrlChanges && !hasApiKeyChanges && (
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none"
+              >
+                {saving ? '...' : t('settings.save')}
+              </button>
+            )}
+            {canTestOpenAI && (
+              <button
+                type="button"
+                onClick={handleTest}
+                disabled={saving || testing}
+                className="px-3 py-1.5 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
+              >
+                {testing ? t('openai.testing') : t('openai.testConnection')}
+              </button>
+            )}
+          </div>
+        </FormField>
+      )}
+
+      {provider === 'openai' && testResult && (
+        <p className={`text-xs ${testResult.ok ? 'text-accent' : 'text-error'}`}>
+          {testResult.ok
+            ? testResult.first_model
+              ? `${t('openai.connected')} (${testResult.model_count} models, ${testResult.first_model})`
+              : `${t('openai.connected')} (${testResult.model_count} models)`
+            : `${t('openai.connectionFailed')}: ${testResult.error}`}
+        </p>
       )}
 
       {message && (

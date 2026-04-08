@@ -2,14 +2,21 @@ import OpenAI from 'openai'
 import { getSetting } from '../../db.js'
 import type { LLMProvider, LLMMessageParams, LLMStreamResult } from './provider.js'
 
-let cachedKey = ''
+let cachedConfig = ''
 let cachedClient: OpenAI | null = null
+
+function getOpenAIBaseUrl(): string | undefined {
+  const baseURL = (getSetting('openai.base_url') || '').trim()
+  return baseURL || undefined
+}
 
 export function getOpenAIClient(): OpenAI {
   const key = getSetting('api_key.openai') || ''
-  if (cachedClient && key === cachedKey) return cachedClient
-  cachedKey = key
-  cachedClient = new OpenAI({ apiKey: key })
+  const baseURL = getOpenAIBaseUrl()
+  const configKey = `${key}\n${baseURL ?? ''}`
+  if (cachedClient && configKey === cachedConfig) return cachedClient
+  cachedConfig = configKey
+  cachedClient = new OpenAI({ apiKey: key, baseURL })
   return cachedClient
 }
 
