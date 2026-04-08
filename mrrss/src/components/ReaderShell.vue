@@ -731,6 +731,10 @@ function filterIconName(filter: FilterMode) {
   }
 }
 
+function isFilterActive(filter: FilterMode) {
+  return selection.value.kind === 'filter' && selection.value === filter
+}
+
 function faviconUrl(rawUrl: string) {
   try {
     const hostname = new URL(rawUrl).hostname
@@ -774,7 +778,7 @@ function faviconUrl(rawUrl: string) {
           @click="selectFilter(filter.key)"
         >
           <svg v-if="filterIconName(filter.key) === 'grid'" viewBox="0 0 24 24" aria-hidden="true">
-            <template v-if="selection.kind === 'filter' && selection.value === filter.key">
+            <template v-if="isFilterActive(filter.key)">
               <rect x="4" y="4" width="6" height="6" rx="1.2" />
               <rect x="14" y="4" width="6" height="6" rx="1.2" />
               <rect x="4" y="14" width="6" height="6" rx="1.2" />
@@ -788,35 +792,68 @@ function faviconUrl(rawUrl: string) {
             </template>
           </svg>
           <svg v-else-if="filterIconName(filter.key) === 'inbox'" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4 5h16v12H4z" fill="none" stroke="currentColor" stroke-width="1.8" />
-            <path d="M4 14h4l2 3h4l2-3h4" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <template v-if="isFilterActive(filter.key)">
+              <path d="M4 5h16v12H4z" fill="currentColor" />
+              <path d="M4 14h4l2 3h4l2-3h4" fill="none" stroke="#ffffff" stroke-width="1.8" />
+            </template>
+            <template v-else>
+              <path d="M4 5h16v12H4z" fill="none" stroke="currentColor" stroke-width="1.8" />
+              <path d="M4 14h4l2 3h4l2-3h4" fill="none" stroke="currentColor" stroke-width="1.8" />
+            </template>
           </svg>
           <svg v-else-if="filterIconName(filter.key) === 'star'" viewBox="0 0 24 24" aria-hidden="true">
             <path
               d="m12 4 2.5 5.2 5.7.8-4.1 4 1 5.8L12 17l-5.1 2.8 1-5.8-4.1-4 5.7-.8z"
-              :fill="selection.kind === 'filter' && selection.value === filter.key ? 'currentColor' : 'none'"
+              :fill="isFilterActive(filter.key) ? 'currentColor' : 'none'"
               stroke="currentColor"
               stroke-width="1.8"
             />
           </svg>
           <svg v-else-if="filterIconName(filter.key) === 'bookmark'" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8" />
-            <path d="M12 7v5l-3 2" fill="none" stroke="currentColor" stroke-width="1.8" />
-            <path d="M6.6 9.6A7.9 7.9 0 0 1 12 4" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <template v-if="isFilterActive(filter.key)">
+              <circle cx="12" cy="12" r="8" fill="currentColor" />
+              <path d="M12 7v5l-3 2" fill="none" stroke="#ffffff" stroke-width="1.8" />
+              <path d="M6.6 9.6A7.9 7.9 0 0 1 12 4" fill="none" stroke="#ffffff" stroke-width="1.8" />
+            </template>
+            <template v-else>
+              <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8" />
+              <path d="M12 7v5l-3 2" fill="none" stroke="currentColor" stroke-width="1.8" />
+              <path d="M6.6 9.6A7.9 7.9 0 0 1 12 4" fill="none" stroke="currentColor" stroke-width="1.8" />
+            </template>
           </svg>
           <svg v-else-if="filterIconName(filter.key) === 'clock'" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8" />
-            <path d="M12 8v5l3 2" fill="none" stroke="currentColor" stroke-width="1.8" />
-            <circle cx="18.4" cy="7.2" r="1.2" fill="currentColor" />
+            <template v-if="isFilterActive(filter.key)">
+              <circle cx="12" cy="12" r="8" fill="currentColor" />
+              <path d="M12 8v5l3 2" fill="none" stroke="#ffffff" stroke-width="1.8" />
+              <circle cx="18.4" cy="7.2" r="1.2" fill="#ffffff" />
+            </template>
+            <template v-else>
+              <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8" />
+              <path d="M12 8v5l3 2" fill="none" stroke="currentColor" stroke-width="1.8" />
+              <circle cx="18.4" cy="7.2" r="1.2" fill="currentColor" />
+            </template>
           </svg>
           <svg v-else-if="filterIconName(filter.key) === 'gallery'" viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="4" y="5" width="16" height="14" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8" />
-            <path d="M8 14l2.5-2.5 2.5 2.5 3-3L20 14" fill="none" stroke="currentColor" stroke-width="1.8" />
-            <circle cx="9" cy="9" r="1.4" fill="currentColor" />
+            <template v-if="isFilterActive(filter.key)">
+              <rect x="4" y="5" width="16" height="14" rx="1.5" fill="currentColor" />
+              <path d="M8 14l2.5-2.5 2.5 2.5 3-3L20 14" fill="none" stroke="#ffffff" stroke-width="1.8" />
+              <circle cx="9" cy="9" r="1.4" fill="#ffffff" />
+            </template>
+            <template v-else>
+              <rect x="4" y="5" width="16" height="14" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8" />
+              <path d="M8 14l2.5-2.5 2.5 2.5 3-3L20 14" fill="none" stroke="currentColor" stroke-width="1.8" />
+              <circle cx="9" cy="9" r="1.4" fill="currentColor" />
+            </template>
           </svg>
           <svg v-else viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="5" y="6" width="12" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8" />
-            <path d="M17 10h2.5a1.5 1.5 0 0 1 0 3H17" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <template v-if="isFilterActive(filter.key)">
+              <rect x="5" y="6" width="12" height="12" rx="1.5" fill="currentColor" />
+              <path d="M17 10h2.5a1.5 1.5 0 0 1 0 3H17" fill="none" stroke="#ffffff" stroke-width="1.8" />
+            </template>
+            <template v-else>
+              <rect x="5" y="6" width="12" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8" />
+              <path d="M17 10h2.5a1.5 1.5 0 0 1 0 3H17" fill="none" stroke="currentColor" stroke-width="1.8" />
+            </template>
           </svg>
           <span v-if="filter.key === 'all' && (stats?.unread_articles ?? 0) > 0" class="mode-rail__badge">
             {{ (stats?.unread_articles ?? 0) > 99 ? '99+' : (stats?.unread_articles ?? 0) }}
