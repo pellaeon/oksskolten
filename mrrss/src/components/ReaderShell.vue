@@ -928,9 +928,11 @@ function faviconUrl(rawUrl: string) {
         </div>
         <div class="pane-actions">
           <button class="pane-icon-button" type="button" title="Refresh" @click="refreshSidebar">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M20 6v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" />
-              <path d="M20 11a8 8 0 1 0 2 5.3" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <svg viewBox="0 0 256 256" aria-hidden="true">
+              <path
+                d="M240,56v48a8,8,0,0,1-8,8H184a8,8,0,0,1,0-16H211.4L184.81,71.64l-.25-.24a80,80,0,1,0-1.67,114.78,8,8,0,0,1,11,11.63A95.44,95.44,0,0,1,128,224h-1.32A96,96,0,1,1,195.75,60L224,85.8V56a8,8,0,1,1,16,0Z"
+                fill="currentColor"
+              />
             </svg>
           </button>
           <button class="pane-icon-button" type="button" title="Close" @click="toggleFeedList">
@@ -1049,9 +1051,11 @@ function faviconUrl(rawUrl: string) {
             </svg>
           </button>
           <button class="pane-icon-button" type="button" title="Refresh" @click="loadArticles">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M20 6v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" />
-              <path d="M20 11a8 8 0 1 0 2 5.3" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <svg viewBox="0 0 256 256" aria-hidden="true">
+              <path
+                d="M240,56v48a8,8,0,0,1-8,8H184a8,8,0,0,1,0-16H211.4L184.81,71.64l-.25-.24a80,80,0,1,0-1.67,114.78,8,8,0,0,1,11,11.63A95.44,95.44,0,0,1,128,224h-1.32A96,96,0,1,1,195.75,60L224,85.8V56a8,8,0,1,1,16,0Z"
+                fill="currentColor"
+              />
             </svg>
           </button>
         </div>
