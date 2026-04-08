@@ -350,7 +350,40 @@ a {
 .articles-pane__list {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.articles-pane__list.is-scrollbar-visible {
+  scrollbar-color: var(--border) transparent;
+}
+
+.articles-pane__list::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.articles-pane__list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.articles-pane__list::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.articles-pane__list.is-scrollbar-visible::-webkit-scrollbar-thumb {
+  background: var(--border);
+}
+
+.articles-pane__list::-webkit-scrollbar-thumb:hover {
+  background: transparent;
+}
+
+.articles-pane__list.is-scrollbar-visible::-webkit-scrollbar-thumb:hover {
+  background: #94a1b2;
 }
 
 .feeds-pane__header,
@@ -620,10 +653,6 @@ a {
 .article-row.is-active {
   background: #f8fbff;
   border-left-color: var(--accent);
-}
-
-.article-row.is-unread h3 {
-  font-weight: 700;
 }
 
 .article-row:hover {

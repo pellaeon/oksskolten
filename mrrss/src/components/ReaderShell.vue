@@ -80,6 +80,8 @@ const showOnlyUnreadInList = ref(false)
 const articleFilterOpen = ref(false)
 const articleSearchQuery = ref('')
 const markingAllRead = ref(false)
+const articleListScrollbarVisible = ref(false)
+let articleListScrollbarHideTimer: ReturnType<typeof setTimeout> | null = null
 
 const deferredUnreadAutoReadIds = new Set<number>()
 const deferredUnreadManualReadIds = new Set<number>()
@@ -296,6 +298,10 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown)
+  if (articleListScrollbarHideTimer != null) {
+    clearTimeout(articleListScrollbarHideTimer)
+    articleListScrollbarHideTimer = null
+  }
 })
 
 watch(currentQuery, async () => {
@@ -743,6 +749,24 @@ function faviconUrl(rawUrl: string) {
     return ''
   }
 }
+
+function showArticleListScrollbar() {
+  if (articleListScrollbarHideTimer != null) {
+    clearTimeout(articleListScrollbarHideTimer)
+    articleListScrollbarHideTimer = null
+  }
+  articleListScrollbarVisible.value = true
+}
+
+function scheduleHideArticleListScrollbar() {
+  if (articleListScrollbarHideTimer != null) {
+    clearTimeout(articleListScrollbarHideTimer)
+  }
+  articleListScrollbarHideTimer = setTimeout(() => {
+    articleListScrollbarVisible.value = false
+    articleListScrollbarHideTimer = null
+  }, 1000)
+}
 </script>
 
 <template>
@@ -810,15 +834,12 @@ function faviconUrl(rawUrl: string) {
             />
           </svg>
           <svg v-else-if="filterIconName(filter.key) === 'bookmark'" viewBox="0 0 24 24" aria-hidden="true">
-            <template v-if="isFilterActive(filter.key)">
-              <circle cx="12" cy="12" r="8" fill="currentColor" />
-              <circle cx="12" cy="12" r="4.2" fill="#ffffff" opacity="0.28" />
-            </template>
-            <template v-else>
-              <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8" />
-              <path d="M12 7v5l-3 2" fill="none" stroke="currentColor" stroke-width="1.8" />
-              <path d="M6.6 9.6A7.9 7.9 0 0 1 12 4" fill="none" stroke="currentColor" stroke-width="1.8" />
-            </template>
+            <path
+              d="M7 4h10v16l-5-3-5 3z"
+              :fill="isFilterActive(filter.key) ? 'currentColor' : 'none'"
+              stroke="currentColor"
+              stroke-width="1.8"
+            />
           </svg>
           <svg v-else-if="filterIconName(filter.key) === 'clock'" viewBox="0 0 24 24" aria-hidden="true">
             <template v-if="isFilterActive(filter.key)">
@@ -1060,7 +1081,13 @@ function faviconUrl(rawUrl: string) {
         {{ flashMessage.text }}
       </p>
 
-      <div class="articles-pane__list">
+      <div
+        class="articles-pane__list"
+        :class="{ 'is-scrollbar-visible': articleListScrollbarVisible }"
+        @mouseenter="showArticleListScrollbar"
+        @mousemove="showArticleListScrollbar"
+        @mouseleave="scheduleHideArticleListScrollbar"
+      >
         <div v-if="articleError" class="pane-flat-state pane-flat-state--error">{{ articleError }}</div>
         <div v-else-if="articleLoading" class="pane-flat-state">Loading articles…</div>
         <div v-else-if="displayedArticles.length === 0" class="pane-flat-state">No articles found.</div>
@@ -1090,7 +1117,7 @@ function faviconUrl(rawUrl: string) {
           v-for="article in displayedArticles"
           :key="article.id"
           class="article-row"
-          :class="{ 'is-active': selectedArticleUrl === article.url, 'is-unread': !article.seen_at }"
+          :class="{ 'is-active': selectedArticleUrl === article.url }"
           type="button"
           @click="selectedArticleUrl = article.url"
         >
@@ -1112,18 +1139,6 @@ function faviconUrl(rawUrl: string) {
             <span v-if="article.bookmarked_at" class="status-chip" title="Read Later" aria-label="Read Later">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M7 4h10v16l-5-3-5 3z" fill="none" stroke="currentColor" stroke-width="1.8" />
-              </svg>
-            </span>
-            <span v-if="article.read_at" class="status-chip" title="Read" aria-label="Read">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8" />
-                <path d="M12 8v5l3 2" fill="none" stroke="currentColor" stroke-width="1.8" />
-              </svg>
-            </span>
-            <span v-if="!article.seen_at" class="status-chip" title="Unread" aria-label="Unread">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 5h16v12H4z" fill="none" stroke="currentColor" stroke-width="1.8" />
-                <path d="M4 14h4l2 3h4l2-3h4" fill="none" stroke="currentColor" stroke-width="1.8" />
               </svg>
             </span>
           </div>
