@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { ArticleDetail, ArticleListItem, Category, FeedWithCounts } from '../../../shared/types'
 import {
   ApiRequestError,
@@ -19,6 +19,7 @@ import {
   setBookmarked,
   setLiked,
   setSeen,
+  searchArticles,
   summarizeArticle,
   translateArticle,
   type StatsResponse,
@@ -82,6 +83,23 @@ const articleSearchQuery = ref('')
 const markingAllRead = ref(false)
 const articleListScrollbarVisible = ref(false)
 let articleListScrollbarHideTimer: ReturnType<typeof setTimeout> | null = null
+const searchOpen = ref(false)
+const searchQuery = ref('')
+const searchInputRef = ref<HTMLInputElement | null>(null)
+const searchResults = ref<ArticleListItem[]>([])
+const searchRecent = ref<ArticleListItem[]>([])
+const searchLoading = ref(false)
+const searchHasSearched = ref(false)
+const searchIndexBuilding = ref(false)
+const searchFilterBookmarked = ref(false)
+const searchFilterLiked = ref(false)
+const searchFilterUnread = ref(false)
+const searchDatePeriod = ref<'today' | 'week' | 'month' | null>(null)
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+let searchRetryTimer: ReturnType<typeof setTimeout> | null = null
+let searchAbortController: AbortController | null = null
+const searchResultsScrollbarVisible = ref(false)
+let searchResultsScrollbarHideTimer: ReturnType<typeof setTimeout> | null = null
 
 const deferredUnreadAutoReadIds = new Set<number>()
 const deferredUnreadManualReadIds = new Set<number>()
@@ -220,6 +238,7 @@ const displayedArticles = computed(() => {
 })
 
 const isGalleryMode = computed(() => selection.value.kind === 'filter' && selection.value.value === 'gallery')
+const searchDisplayItems = computed(() => searchQuery.value.trim() ? searchResults.value : searchRecent.value)
 
 function showMessage(type: 'success' | 'error', text: string) {
   flashMessage.value = { type, text }
@@ -238,6 +257,14 @@ function moveSelection(delta: 1 | -1) {
 }
 
 function handleKeyDown(event: KeyboardEvent) {
+  if (searchOpen.value) {
+    if (event.key === 'Escape') {
+      closeSearch()
+      event.preventDefault()
+    }
+    return
+  }
+
   if (settingsOpen.value) {
     if (event.key === 'Escape') settingsOpen.value = false
     return
@@ -302,6 +329,22 @@ onUnmounted(() => {
     clearTimeout(articleListScrollbarHideTimer)
     articleListScrollbarHideTimer = null
   }
+  if (searchDebounceTimer != null) {
+    clearTimeout(searchDebounceTimer)
+    searchDebounceTimer = null
+  }
+  if (searchRetryTimer != null) {
+    clearTimeout(searchRetryTimer)
+    searchRetryTimer = null
+  }
+  if (searchAbortController != null) {
+    searchAbortController.abort()
+    searchAbortController = null
+  }
+  if (searchResultsScrollbarHideTimer != null) {
+    clearTimeout(searchResultsScrollbarHideTimer)
+    searchResultsScrollbarHideTimer = null
+  }
 })
 
 watch(currentQuery, async () => {
@@ -322,6 +365,20 @@ watch(displayedArticles, (next) => {
     selectedArticleUrl.value = next[0]?.url ?? null
   }
 }, { deep: true })
+
+watch(
+  [searchQuery, searchFilterBookmarked, searchFilterLiked, searchFilterUnread, searchDatePeriod, searchOpen],
+  () => {
+    if (!searchOpen.value) return
+    if (searchDebounceTimer != null) {
+      clearTimeout(searchDebounceTimer)
+      searchDebounceTimer = null
+    }
+    searchDebounceTimer = setTimeout(() => {
+      void runSearch()
+    }, 300)
+  },
+)
 
 async function refreshSidebar(silent = false) {
   if (!silent) {
@@ -725,6 +782,173 @@ function toggleActivityBar() {
   localStorage.setItem('mrrss.activity-collapsed', String(activityBarCollapsed.value))
 }
 
+function buildSearchSince() {
+  const period = searchDatePeriod.value
+  if (!period) return undefined
+
+  const now = new Date()
+  if (period === 'today') {
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+  }
+  if (period === 'week') {
+    const next = new Date(now)
+    next.setDate(next.getDate() - 7)
+    return next.toISOString()
+  }
+  const next = new Date(now)
+  next.setMonth(next.getMonth() - 1)
+  return next.toISOString()
+}
+
+async function loadSearchRecent() {
+  try {
+    const data = await getArticles({ read: true, limit: 10, no_floor: true })
+    searchRecent.value = data.articles
+  } catch {
+    searchRecent.value = []
+  }
+}
+
+async function runSearch() {
+  if (searchRetryTimer != null) {
+    clearTimeout(searchRetryTimer)
+    searchRetryTimer = null
+  }
+
+  const query = searchQuery.value.trim()
+  if (!query) {
+    searchResults.value = []
+    searchHasSearched.value = false
+    searchIndexBuilding.value = false
+    searchLoading.value = false
+    return
+  }
+
+  if (searchAbortController != null) {
+    searchAbortController.abort()
+    searchAbortController = null
+  }
+
+  const controller = new AbortController()
+  searchAbortController = controller
+  searchLoading.value = true
+
+  try {
+    const result = await searchArticles({
+      q: query,
+      bookmarked: searchFilterBookmarked.value,
+      liked: searchFilterLiked.value,
+      unread: searchFilterUnread.value,
+      since: buildSearchSince(),
+      limit: 20,
+      offset: 0,
+    }, controller.signal)
+
+    if (result.indexBuilding) {
+      searchIndexBuilding.value = true
+      searchResults.value = []
+      searchHasSearched.value = true
+      searchRetryTimer = setTimeout(() => {
+        void runSearch()
+      }, 3000)
+      return
+    }
+
+    searchIndexBuilding.value = false
+    searchResults.value = result.articles
+    searchHasSearched.value = true
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return
+    searchResults.value = []
+    searchHasSearched.value = true
+  } finally {
+    if (searchAbortController === controller) {
+      searchAbortController = null
+    }
+    searchLoading.value = false
+  }
+}
+
+async function openSearch() {
+  addMenuOpen.value = false
+  searchOpen.value = true
+  await nextTick()
+  searchInputRef.value?.focus()
+  if (searchRecent.value.length === 0) {
+    await loadSearchRecent()
+  }
+}
+
+function closeSearch() {
+  searchOpen.value = false
+  searchQuery.value = ''
+  searchResults.value = []
+  searchHasSearched.value = false
+  searchIndexBuilding.value = false
+  searchFilterBookmarked.value = false
+  searchFilterLiked.value = false
+  searchFilterUnread.value = false
+  searchDatePeriod.value = null
+
+  if (searchDebounceTimer != null) {
+    clearTimeout(searchDebounceTimer)
+    searchDebounceTimer = null
+  }
+  if (searchRetryTimer != null) {
+    clearTimeout(searchRetryTimer)
+    searchRetryTimer = null
+  }
+  if (searchAbortController != null) {
+    searchAbortController.abort()
+    searchAbortController = null
+  }
+  if (searchResultsScrollbarHideTimer != null) {
+    clearTimeout(searchResultsScrollbarHideTimer)
+    searchResultsScrollbarHideTimer = null
+  }
+  searchResultsScrollbarVisible.value = false
+}
+
+function selectSearchResult(article: ArticleListItem) {
+  selectedArticleUrl.value = article.url
+  closeSearch()
+}
+
+function toggleSearchDatePeriod(period: 'today' | 'week' | 'month') {
+  searchDatePeriod.value = searchDatePeriod.value === period ? null : period
+}
+
+function formatSearchDate(value: string | null) {
+  if (!value) return 'No date'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'No date'
+
+  const diffMs = Date.now() - date.getTime()
+  const dayMs = 24 * 60 * 60 * 1000
+  if (diffMs < dayMs) return 'Today'
+  if (diffMs < dayMs * 2) return 'Yesterday'
+  if (diffMs < dayMs * 7) return `${Math.max(1, Math.floor(diffMs / dayMs))} days ago`
+  return date.toLocaleDateString()
+}
+
+function showSearchResultsScrollbar() {
+  if (searchResultsScrollbarHideTimer != null) {
+    clearTimeout(searchResultsScrollbarHideTimer)
+    searchResultsScrollbarHideTimer = null
+  }
+  searchResultsScrollbarVisible.value = true
+}
+
+function scheduleHideSearchResultsScrollbar() {
+  if (searchResultsScrollbarHideTimer != null) {
+    clearTimeout(searchResultsScrollbarHideTimer)
+  }
+  searchResultsScrollbarHideTimer = setTimeout(() => {
+    searchResultsScrollbarVisible.value = false
+    searchResultsScrollbarHideTimer = null
+  }, 1000)
+}
+
 function filterIconName(filter: FilterMode) {
   switch (filter) {
     case 'all': return 'grid'
@@ -892,6 +1116,12 @@ function scheduleHideArticleListScrollbar() {
             <button type="button" @click="openCompose('category')">Add Category</button>
           </div>
         </div>
+        <button class="mode-rail__button" type="button" title="Search" @click="openSearch">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="6.2" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path d="m16 16 4 4" fill="none" stroke="currentColor" stroke-width="1.8" />
+          </svg>
+        </button>
         <button class="mode-rail__button" type="button" title="Settings" @click="settingsOpen = true">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 8.6A3.4 3.4 0 1 0 12 15.4 3.4 3.4 0 1 0 12 8.6z" fill="none" stroke="currentColor" stroke-width="1.8" />
@@ -1117,7 +1347,7 @@ function scheduleHideArticleListScrollbar() {
           v-for="article in displayedArticles"
           :key="article.id"
           class="article-row"
-          :class="{ 'is-active': selectedArticleUrl === article.url }"
+          :class="{ 'is-active': selectedArticleUrl === article.url, 'is-read': Boolean(article.seen_at || article.read_at) }"
           type="button"
           @click="selectedArticleUrl = article.url"
         >
@@ -1159,6 +1389,114 @@ function scheduleHideArticleListScrollbar() {
       @translate="handleTranslate"
       @archive-images="handleArchiveImages"
     />
+
+    <div v-if="searchOpen" class="search-sheet__backdrop" @click.self="closeSearch">
+      <section class="search-sheet" role="dialog" aria-modal="true" aria-label="Search">
+        <header class="search-sheet__header">
+          <h2>Search</h2>
+          <button class="search-sheet__close" type="button" @click="closeSearch" aria-label="Close search">×</button>
+        </header>
+
+        <div class="search-sheet__input-wrap">
+          <input
+            ref="searchInputRef"
+            v-model="searchQuery"
+            class="search-sheet__input"
+            type="text"
+            placeholder="Search articles..."
+          />
+          <button
+            class="search-sheet__clear"
+            :class="{ 'is-visible': Boolean(searchQuery) }"
+            type="button"
+            aria-label="Clear search query"
+            @click="searchQuery = ''"
+          >
+            ×
+          </button>
+        </div>
+
+        <div class="search-sheet__filters">
+          <button
+            class="search-chip"
+            :class="{ 'is-active': searchFilterBookmarked }"
+            type="button"
+            @click="searchFilterBookmarked = !searchFilterBookmarked"
+          >
+            Read Later
+          </button>
+          <button
+            class="search-chip"
+            :class="{ 'is-active': searchFilterLiked }"
+            type="button"
+            @click="searchFilterLiked = !searchFilterLiked"
+          >
+            Liked
+          </button>
+          <button
+            class="search-chip"
+            :class="{ 'is-active': searchFilterUnread }"
+            type="button"
+            @click="searchFilterUnread = !searchFilterUnread"
+          >
+            Unread
+          </button>
+          <span class="search-chip-divider" />
+          <button
+            class="search-chip"
+            :class="{ 'is-active': searchDatePeriod === 'today' }"
+            type="button"
+            @click="toggleSearchDatePeriod('today')"
+          >
+            Today
+          </button>
+          <button
+            class="search-chip"
+            :class="{ 'is-active': searchDatePeriod === 'week' }"
+            type="button"
+            @click="toggleSearchDatePeriod('week')"
+          >
+            Week
+          </button>
+          <button
+            class="search-chip"
+            :class="{ 'is-active': searchDatePeriod === 'month' }"
+            type="button"
+            @click="toggleSearchDatePeriod('month')"
+          >
+            Month
+          </button>
+        </div>
+
+        <div
+          class="search-sheet__results"
+          :class="{ 'is-scrollbar-visible': searchResultsScrollbarVisible }"
+          @mouseenter="showSearchResultsScrollbar"
+          @mousemove="showSearchResultsScrollbar"
+          @mouseleave="scheduleHideSearchResultsScrollbar"
+        >
+          <p v-if="searchIndexBuilding" class="search-sheet__empty">Building search index…</p>
+          <p v-else-if="searchLoading" class="search-sheet__empty">Searching…</p>
+          <p v-else-if="searchHasSearched && searchDisplayItems.length === 0" class="search-sheet__empty">No matching articles</p>
+          <template v-else>
+            <button
+              v-for="article in searchDisplayItems"
+              :key="article.id"
+              class="search-result"
+              type="button"
+              @click="selectSearchResult(article)"
+            >
+              <h3>{{ article.title }}</h3>
+              <p>
+                <span>{{ article.feed_name }}</span>
+                <span>·</span>
+                <span>{{ formatSearchDate(article.published_at) }}</span>
+              </p>
+            </button>
+          </template>
+        </div>
+      </section>
+    </div>
 
     <SettingsPanel :open="settingsOpen" @close="settingsOpen = false" />
 

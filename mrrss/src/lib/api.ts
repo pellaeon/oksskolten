@@ -46,6 +46,23 @@ export interface ArticlesResponse {
   total_without_floor?: number
 }
 
+export interface ArticleSearchQuery {
+  q: string
+  bookmarked?: boolean
+  liked?: boolean
+  unread?: boolean
+  since?: string
+  until?: string
+  limit?: number
+  offset?: number
+}
+
+export interface ArticleSearchResponse {
+  articles: ArticleListItem[]
+  has_more: boolean
+  indexBuilding?: boolean
+}
+
 export interface ArticleQuery {
   feed_id?: number
   category_id?: number
@@ -247,6 +264,39 @@ export function getArticles(query: ArticleQuery) {
 
 export function getArticleByUrl(url: string) {
   return request<ArticleDetail>(`/api/articles/by-url?url=${encodeURIComponent(url)}`)
+}
+
+export async function searchArticles(query: ArticleSearchQuery, signal?: AbortSignal) {
+  const token = getAuthToken()
+  const params = new URLSearchParams()
+
+  params.set('q', query.q)
+  if (query.bookmarked) params.set('bookmarked', '1')
+  if (query.liked) params.set('liked', '1')
+  if (query.unread) params.set('unread', '1')
+  if (query.since) params.set('since', query.since)
+  if (query.until) params.set('until', query.until)
+  if (query.limit != null) params.set('limit', String(query.limit))
+  if (query.offset != null) params.set('offset', String(query.offset))
+
+  const response = await fetch(`/api/articles/search?${params.toString()}`, {
+    signal,
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  })
+
+  if (response.status === 503) {
+    return { articles: [], has_more: false, indexBuilding: true } as ArticleSearchResponse
+  }
+
+  if (!response.ok) {
+    return { articles: [], has_more: false } as ArticleSearchResponse
+  }
+
+  const data = await response.json() as { articles?: ArticleListItem[]; has_more?: boolean }
+  return {
+    articles: data.articles ?? [],
+    has_more: data.has_more ?? false,
+  } as ArticleSearchResponse
 }
 
 export async function clipArticleFromUrl(url: string, force = false) {
