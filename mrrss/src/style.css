@@ -300,6 +300,10 @@ a {
   transform: scale(1.03);
 }
 
+.mode-rail__button.is-active svg {
+  transform: scale(1.05);
+}
+
 .mode-rail__badge {
   position: absolute;
   right: 4px;
@@ -421,6 +425,11 @@ a {
 .pane-icon-button.is-active {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+.pane-icon-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .feeds-tree {

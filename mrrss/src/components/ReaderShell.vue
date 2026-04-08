@@ -774,24 +774,40 @@ function faviconUrl(rawUrl: string) {
           @click="selectFilter(filter.key)"
         >
           <svg v-if="filterIconName(filter.key) === 'grid'" viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="4" y="4" width="6" height="6" rx="1.2" />
-            <rect x="14" y="4" width="6" height="6" rx="1.2" />
-            <rect x="4" y="14" width="6" height="6" rx="1.2" />
-            <rect x="14" y="14" width="6" height="6" rx="1.2" />
+            <template v-if="selection.kind === 'filter' && selection.value === filter.key">
+              <rect x="4" y="4" width="6" height="6" rx="1.2" />
+              <rect x="14" y="4" width="6" height="6" rx="1.2" />
+              <rect x="4" y="14" width="6" height="6" rx="1.2" />
+              <rect x="14" y="14" width="6" height="6" rx="1.2" />
+            </template>
+            <template v-else>
+              <path d="M5 7h14M5 12h14M5 17h14" fill="none" stroke="currentColor" stroke-width="1.8" />
+              <circle cx="7" cy="7" r="1" fill="currentColor" />
+              <circle cx="7" cy="12" r="1" fill="currentColor" />
+              <circle cx="7" cy="17" r="1" fill="currentColor" />
+            </template>
           </svg>
           <svg v-else-if="filterIconName(filter.key) === 'inbox'" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 5h16v12H4z" fill="none" stroke="currentColor" stroke-width="1.8" />
             <path d="M4 14h4l2 3h4l2-3h4" fill="none" stroke="currentColor" stroke-width="1.8" />
           </svg>
           <svg v-else-if="filterIconName(filter.key) === 'star'" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="m12 4 2.5 5.2 5.7.8-4.1 4 1 5.8L12 17l-5.1 2.8 1-5.8-4.1-4 5.7-.8z" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path
+              d="m12 4 2.5 5.2 5.7.8-4.1 4 1 5.8L12 17l-5.1 2.8 1-5.8-4.1-4 5.7-.8z"
+              :fill="selection.kind === 'filter' && selection.value === filter.key ? 'currentColor' : 'none'"
+              stroke="currentColor"
+              stroke-width="1.8"
+            />
           </svg>
           <svg v-else-if="filterIconName(filter.key) === 'bookmark'" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M7 4h10v16l-5-3-5 3z" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path d="M12 7v5l-3 2" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path d="M6.6 9.6A7.9 7.9 0 0 1 12 4" fill="none" stroke="currentColor" stroke-width="1.8" />
           </svg>
           <svg v-else-if="filterIconName(filter.key) === 'clock'" viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8" />
             <path d="M12 8v5l3 2" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <circle cx="18.4" cy="7.2" r="1.2" fill="currentColor" />
           </svg>
           <svg v-else-if="filterIconName(filter.key) === 'gallery'" viewBox="0 0 24 24" aria-hidden="true">
             <rect x="4" y="5" width="16" height="14" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8" />
@@ -841,12 +857,27 @@ function faviconUrl(rawUrl: string) {
           @click="toggleFeedList"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M5 6h14M5 12h14M5 18h14" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <rect x="4" y="5" width="16" height="14" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path d="M9 5v14" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path
+              v-if="feedListExpanded"
+              d="M12.5 12h5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+            />
+            <path
+              v-else
+              d="M12.5 12h5M15 9.5 12.5 12l2.5 2.5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+            />
           </svg>
         </button>
         <button class="mode-rail__button" type="button" title="Collapse Activity Bar" @click="toggleActivityBar">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path d="M5 6v12M9 7h10M9 12h8M9 17h10" fill="none" stroke="currentColor" stroke-width="1.8" />
           </svg>
         </button>
       </div>
@@ -938,8 +969,18 @@ function faviconUrl(rawUrl: string) {
           <h2>{{ currentLabel }}</h2>
         </div>
         <div class="pane-actions pane-actions--article-controls">
-          <button class="sidebar-header__button" type="button" :disabled="markingAllRead" @click="handleMarkAllAsRead">
-            {{ markingAllRead ? 'Marking…' : 'Mark All as Read' }}
+          <button
+            class="pane-icon-button"
+            type="button"
+            :disabled="markingAllRead"
+            title="Mark All as Read"
+            aria-label="Mark All as Read"
+            @click="handleMarkAllAsRead"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8" />
+              <path d="m8.6 12.2 2.2 2.2 4.8-4.8" fill="none" stroke="currentColor" stroke-width="1.8" />
+            </svg>
           </button>
           <button
             class="pane-icon-button"
