@@ -247,6 +247,7 @@ a {
 .pane-icon-button {
   width: 28px;
   height: 28px;
+  flex: 0 0 28px;
   border: 0;
   padding: 0;
   background: transparent;
@@ -254,6 +255,7 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  line-height: 0;
   border-radius: 6px;
   transition: color 120ms ease, background-color 120ms ease, transform 120ms ease;
 }
@@ -376,6 +378,7 @@ a {
   align-items: center;
   gap: 6px;
   min-height: 28px;
+  line-height: 0;
 }
 
 .feeds-pane__header .pane-icon-button svg,
@@ -384,6 +387,7 @@ a {
   height: 16px;
   display: block;
   flex: 0 0 16px;
+  transform-origin: center;
 }
 
 .pane-actions--article-controls {
