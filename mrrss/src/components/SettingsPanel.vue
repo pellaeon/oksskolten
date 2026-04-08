@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { DEFAULT_FULL_TEXT_HOSTNAME_BLACKLIST_TEXT } from '../../../shared/full-text-fetch'
 import { articleFonts } from '../../../src/data/articleFonts'
 import { highlightThemeFamilies } from '../../../src/data/highlightThemes'
@@ -87,6 +87,8 @@ const retentionStats = ref<RetentionStats | null>(null)
 const previewData = ref<OpmlPreviewResponse | null>(null)
 const previewFile = ref<File | null>(null)
 const importing = ref(false)
+const settingsBodyScrollbarVisible = ref(false)
+let settingsBodyScrollbarHideTimer: ReturnType<typeof setTimeout> | null = null
 
 const profile = reactive<ProfileResponse>({
   account_name: '',
@@ -203,11 +205,36 @@ onMounted(async () => {
   }
 })
 
+onUnmounted(() => {
+  if (settingsBodyScrollbarHideTimer != null) {
+    clearTimeout(settingsBodyScrollbarHideTimer)
+    settingsBodyScrollbarHideTimer = null
+  }
+})
+
 function showMessage(type: 'success' | 'error', text: string) {
   message.value = { type, text }
   window.setTimeout(() => {
     if (message.value?.text === text) message.value = null
   }, 3500)
+}
+
+function showSettingsBodyScrollbar() {
+  if (settingsBodyScrollbarHideTimer != null) {
+    clearTimeout(settingsBodyScrollbarHideTimer)
+    settingsBodyScrollbarHideTimer = null
+  }
+  settingsBodyScrollbarVisible.value = true
+}
+
+function scheduleHideSettingsBodyScrollbar() {
+  if (settingsBodyScrollbarHideTimer != null) {
+    clearTimeout(settingsBodyScrollbarHideTimer)
+  }
+  settingsBodyScrollbarHideTimer = setTimeout(() => {
+    settingsBodyScrollbarVisible.value = false
+    settingsBodyScrollbarHideTimer = null
+  }, 1000)
 }
 
 function safeParseCustomThemes(raw: string) {
@@ -686,11 +713,17 @@ watch(() => prefs['translate.provider'], (provider) => {
             <svg class="settings-nav__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path :d="tab.icon" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
-            {{ tab.label }}
+            <span class="settings-nav__label">{{ tab.label }}</span>
           </button>
         </nav>
 
-        <div class="settings-body">
+        <div
+          class="settings-body"
+          :class="{ 'is-scrollbar-visible': settingsBodyScrollbarVisible }"
+          @mouseenter="showSettingsBodyScrollbar"
+          @mousemove="showSettingsBodyScrollbar"
+          @mouseleave="scheduleHideSettingsBodyScrollbar"
+        >
           <p v-if="message" class="settings-message" :class="{ 'is-error': message.type === 'error' }">
             {{ message.text }}
           </p>

@@ -879,24 +879,35 @@ a {
 
 .settings-nav__item {
   border: 1px solid transparent;
-  border-radius: 9px;
-  padding: 8px 10px;
-  height: 38px;
-  display: inline-flex;
+  border-radius: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  min-height: 42px;
   text-align: left;
   background: transparent;
   color: #566176;
   font-size: 13px;
   font-weight: 500;
+  line-height: 20px;
   position: relative;
 }
 
 .settings-nav__icon {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  display: block;
+  overflow: visible;
+}
+
+.settings-nav__label {
+  display: inline-flex;
+  align-items: center;
+  line-height: 20px;
+  transform: translateY(1px);
 }
 
 .settings-nav__item.is-active {
@@ -921,10 +932,48 @@ a {
   color: #2e3a4b;
 }
 
+.settings-nav__item.is-active:hover {
+  color: #1f7af0;
+  background: rgba(31, 122, 240, 0.08);
+  border-color: rgba(31, 122, 240, 0.16);
+}
+
 .settings-body {
   overflow: auto;
   padding: 18px 20px 20px;
   background: #fbfcfe;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.settings-body.is-scrollbar-visible {
+  scrollbar-color: var(--border) transparent;
+}
+
+.settings-body::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.settings-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.settings-body::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.settings-body.is-scrollbar-visible::-webkit-scrollbar-thumb {
+  background: var(--border);
+}
+
+.settings-body::-webkit-scrollbar-thumb:hover {
+  background: transparent;
+}
+
+.settings-body.is-scrollbar-visible::-webkit-scrollbar-thumb:hover {
+  background: #94a1b2;
 }
 
 .settings-sheet__header {
