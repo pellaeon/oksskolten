@@ -104,6 +104,27 @@ export interface OpmlPreviewResponse {
   duplicateCount: number
 }
 
+export interface CreateFeedBody {
+  url: string
+  name?: string
+  category_id?: number | null
+}
+
+export class ApiRequestError extends Error {
+  status: number
+  data: unknown
+
+  constructor(status: number, data: unknown, fallbackMessage: string) {
+    const message = typeof data === 'object' && data && 'error' in data && typeof (data as { error?: unknown }).error === 'string'
+      ? (data as { error: string }).error
+      : fallbackMessage
+    super(message)
+    this.name = 'ApiRequestError'
+    this.status = status
+    this.data = data
+  }
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const token = getAuthToken()
   const headers = new Headers(init?.headers)
@@ -197,6 +218,13 @@ export function getCategories() {
   return request<{ categories: Category[] }>('/api/categories')
 }
 
+export function createCategory(name: string) {
+  return request<Category>('/api/categories', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  })
+}
+
 export function getStats() {
   return request<StatsResponse>('/api/stats')
 }
@@ -219,6 +247,86 @@ export function getArticles(query: ArticleQuery) {
 
 export function getArticleByUrl(url: string) {
   return request<ArticleDetail>(`/api/articles/by-url?url=${encodeURIComponent(url)}`)
+}
+
+export async function clipArticleFromUrl(url: string, force = false) {
+  const token = getAuthToken()
+  const response = await fetch('/api/articles/from-url', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ url, force }),
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new ApiRequestError(response.status, data, `${response.status} ${response.statusText}`)
+  }
+
+  return data as { article: ArticleDetail; created?: boolean; moved?: boolean }
+}
+
+export async function createFeed(body: CreateFeedBody) {
+  const token = getAuthToken()
+  const response = await fetch('/api/feeds', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  })
+
+  const contentType = response.headers.get('content-type') || ''
+  if (!contentType.includes('text/event-stream')) {
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new ApiRequestError(response.status, data, `${response.status} ${response.statusText}`)
+    }
+    throw new Error('Unexpected response when creating feed')
+  }
+
+  if (!response.body) throw new Error('Response body is empty')
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let createdFeed: FeedWithCounts | null = null
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      let payload: Record<string, unknown> | null = null
+      try {
+        payload = JSON.parse(line.slice(6)) as Record<string, unknown>
+      } catch {
+        continue
+      }
+
+      if (!payload) continue
+
+      if (payload.type === 'error') {
+        throw new Error(typeof payload.error === 'string' ? payload.error : 'Failed to create feed')
+      }
+
+      if (payload.type === 'done' && payload.feed && typeof payload.feed === 'object') {
+        createdFeed = payload.feed as FeedWithCounts
+      }
+    }
+  }
+
+  if (!createdFeed) {
+    throw new Error('Feed creation did not complete')
+  }
+
+  return createdFeed
 }
 
 export function recordRead(articleId: number) {

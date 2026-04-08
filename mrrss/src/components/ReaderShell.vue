@@ -2,7 +2,11 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { ArticleDetail, ArticleListItem, Category, FeedWithCounts } from '../../../shared/types'
 import {
+  ApiRequestError,
   archiveArticleImages,
+  clipArticleFromUrl,
+  createCategory,
+  createFeed,
   getArticleByUrl,
   getArticles,
   getCategories,
@@ -25,6 +29,7 @@ type Selection =
   | { kind: 'filter'; value: FilterMode }
   | { kind: 'feed'; value: number }
   | { kind: 'category'; value: number }
+type ComposeMode = 'feed' | 'clip' | 'category'
 
 const props = defineProps<{
   email: string
@@ -55,6 +60,18 @@ const translating = ref(false)
 const archiving = ref(false)
 const flashMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
 const feedSearchQuery = ref('')
+const addMenuOpen = ref(false)
+const composeOpen = ref(false)
+const composeMode = ref<ComposeMode>('feed')
+const composeLoading = ref(false)
+const composeError = ref('')
+const feedFormUrl = ref('')
+const feedFormName = ref('')
+const feedFormCategoryId = ref<number | ''>('')
+const clipFormUrl = ref('')
+const clipFormForce = ref(false)
+const clipConflict = ref<{ feedName: string } | null>(null)
+const categoryFormName = ref('')
 
 const deferredUnreadAutoReadIds = new Set<number>()
 const deferredUnreadManualReadIds = new Set<number>()
@@ -133,6 +150,12 @@ const currentLabel = computed(() => {
 
 const currentCount = computed(() => totalArticles.value)
 const isUnreadMode = computed(() => selection.value.kind === 'filter' && selection.value.value === 'unread')
+const categoriesSorted = computed(() => [...categories.value].sort((a, b) => a.name.localeCompare(b.name)))
+const composeTitle = computed(() => {
+  if (composeMode.value === 'feed') return 'Add Feed'
+  if (composeMode.value === 'clip') return 'Clip Page'
+  return 'Add Category'
+})
 
 const currentQuery = computed(() => {
   if (selection.value.kind === 'filter') {
@@ -217,6 +240,13 @@ function handleKeyDown(event: KeyboardEvent) {
     event.preventDefault()
     return
   }
+  if (event.key === 'Escape') {
+    if (composeOpen.value) {
+      closeCompose()
+      event.preventDefault()
+      return
+    }
+  }
 }
 
 onMounted(async () => {
@@ -240,9 +270,11 @@ watch(selectedArticleUrl, async (url) => {
   await loadDetail(url)
 })
 
-async function refreshSidebar() {
-  sidebarError.value = ''
-  sidebarLoading.value = true
+async function refreshSidebar(silent = false) {
+  if (!silent) {
+    sidebarError.value = ''
+    sidebarLoading.value = true
+  }
 
   try {
     const [feedData, categoryData, statsData] = await Promise.all([
@@ -262,7 +294,107 @@ async function refreshSidebar() {
   } catch (err) {
     sidebarError.value = err instanceof Error ? err.message : 'Failed to load sidebar data.'
   } finally {
-    sidebarLoading.value = false
+    if (!silent || sidebarLoading.value) sidebarLoading.value = false
+  }
+}
+
+function openCompose(mode: ComposeMode) {
+  addMenuOpen.value = false
+  composeMode.value = mode
+  composeOpen.value = true
+  composeError.value = ''
+  clipConflict.value = null
+  clipFormForce.value = false
+}
+
+function closeCompose() {
+  composeOpen.value = false
+  composeError.value = ''
+  clipConflict.value = null
+  clipFormForce.value = false
+}
+
+async function handleCreateFeed() {
+  if (!feedFormUrl.value.trim()) {
+    composeError.value = 'Feed URL is required'
+    return
+  }
+  composeLoading.value = true
+  composeError.value = ''
+  try {
+    await createFeed({
+      url: feedFormUrl.value.trim(),
+      name: feedFormName.value.trim() || undefined,
+      category_id: feedFormCategoryId.value === '' ? null : feedFormCategoryId.value,
+    })
+    await refreshSidebar(true)
+    await loadArticles()
+    feedFormUrl.value = ''
+    feedFormName.value = ''
+    feedFormCategoryId.value = ''
+    closeCompose()
+    showMessage('success', 'Feed added')
+  } catch (error) {
+    composeError.value = error instanceof Error ? error.message : 'Failed to add feed'
+  } finally {
+    composeLoading.value = false
+  }
+}
+
+async function handleClipArticle() {
+  if (!clipFormUrl.value.trim()) {
+    composeError.value = 'Page URL is required'
+    return
+  }
+  composeLoading.value = true
+  composeError.value = ''
+  clipConflict.value = null
+  try {
+    await clipArticleFromUrl(clipFormUrl.value.trim(), clipFormForce.value)
+    await refreshSidebar(true)
+    await loadArticles()
+    clipFormUrl.value = ''
+    clipFormForce.value = false
+    closeCompose()
+    showMessage('success', 'Page clipped')
+  } catch (error) {
+    if (error instanceof ApiRequestError && error.status === 409) {
+      const data = error.data as { can_force?: boolean; article?: { feed_name?: string; feed_id?: number; url?: string } }
+      if (data?.can_force && data.article) {
+        clipConflict.value = { feedName: data.article.feed_name || 'another feed' }
+      } else {
+        composeError.value = 'This page is already in Clips.'
+      }
+    } else {
+      composeError.value = error instanceof Error ? error.message : 'Failed to clip page'
+    }
+  } finally {
+    composeLoading.value = false
+  }
+}
+
+async function handleForceClip() {
+  clipFormForce.value = true
+  await handleClipArticle()
+}
+
+async function handleCreateCategory() {
+  if (!categoryFormName.value.trim()) {
+    composeError.value = 'Category name is required'
+    return
+  }
+  composeLoading.value = true
+  composeError.value = ''
+  try {
+    await createCategory(categoryFormName.value.trim())
+    await refreshSidebar(true)
+    categoryFormName.value = ''
+    closeCompose()
+    showMessage('success', 'Category created')
+  } catch (error) {
+    composeError.value = error instanceof Error ? error.message : 'Failed to create category'
+  } finally {
+    composeLoading.value = false
   }
 }
 
@@ -324,7 +456,7 @@ async function loadDetail(url: string) {
         read_at: result.read_at ?? article.read_at ?? new Date().toISOString(),
       }
       syncArticleIntoList(selectedArticle.value)
-      void refreshSidebar()
+      void refreshSidebar(true)
       if (selection.value.kind === 'filter' && (selection.value.value === 'unread' || selection.value.value === 'read')) {
         void loadArticles()
       }
@@ -365,7 +497,7 @@ async function flushDeferredUnreadReads() {
 
   deferredUnreadAutoReadIds.clear()
   deferredUnreadManualReadIds.clear()
-  await refreshSidebar()
+  await refreshSidebar(true)
 }
 
 async function selectFilter(filter: FilterMode) {
@@ -423,7 +555,7 @@ async function handleToggleRead() {
   }
 
   syncArticleIntoList(selectedArticle.value)
-  await refreshSidebar()
+  await refreshSidebar(true)
   await loadArticles()
 }
 
@@ -433,7 +565,7 @@ async function handleToggleLiked() {
   const result = await setLiked(article.id, !article.liked_at)
   selectedArticle.value = { ...article, liked_at: result.liked_at }
   syncArticleIntoList(selectedArticle.value)
-  await refreshSidebar()
+  await refreshSidebar(true)
   await loadArticles()
 }
 
@@ -569,6 +701,18 @@ function faviconUrl(rawUrl: string) {
       </div>
 
       <div class="mode-rail__bottom">
+        <div class="mode-rail__menu-anchor">
+          <button class="mode-rail__button" type="button" title="Add" @click="addMenuOpen = !addMenuOpen">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" />
+            </svg>
+          </button>
+          <div v-if="addMenuOpen" class="quick-add-menu">
+            <button type="button" @click="openCompose('feed')">Add Feed</button>
+            <button type="button" @click="openCompose('clip')">Clip Page</button>
+            <button type="button" @click="openCompose('category')">Add Category</button>
+          </div>
+        </div>
         <button class="mode-rail__button" type="button" title="Settings" @click="settingsOpen = true">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 8.6A3.4 3.4 0 1 0 12 15.4 3.4 3.4 0 1 0 12 8.6z" fill="none" stroke="currentColor" stroke-width="1.8" />
@@ -701,10 +845,28 @@ function faviconUrl(rawUrl: string) {
           <h3>{{ article.title }}</h3>
           <p>{{ article.excerpt || article.summary || 'No preview available.' }}</p>
           <div class="article-row__chips">
-            <span v-if="article.liked_at">Liked</span>
-            <span v-if="article.bookmarked_at">Read Later</span>
-            <span v-if="article.read_at">Read</span>
-            <span v-if="!article.seen_at">Unread</span>
+            <span v-if="article.liked_at" class="status-chip" title="Liked" aria-label="Liked">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m12 4 2.5 5.2 5.7.8-4.1 4 1 5.8L12 17l-5.1 2.8 1-5.8-4.1-4 5.7-.8z" fill="none" stroke="currentColor" stroke-width="1.8" />
+              </svg>
+            </span>
+            <span v-if="article.bookmarked_at" class="status-chip" title="Read Later" aria-label="Read Later">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 4h10v16l-5-3-5 3z" fill="none" stroke="currentColor" stroke-width="1.8" />
+              </svg>
+            </span>
+            <span v-if="article.read_at" class="status-chip" title="Read" aria-label="Read">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8" />
+                <path d="M12 8v5l3 2" fill="none" stroke="currentColor" stroke-width="1.8" />
+              </svg>
+            </span>
+            <span v-if="!article.seen_at" class="status-chip" title="Unread" aria-label="Unread">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 5h16v12H4z" fill="none" stroke="currentColor" stroke-width="1.8" />
+                <path d="M4 14h4l2 3h4l2-3h4" fill="none" stroke="currentColor" stroke-width="1.8" />
+              </svg>
+            </span>
           </div>
         </button>
       </div>
@@ -725,5 +887,77 @@ function faviconUrl(rawUrl: string) {
     />
 
     <SettingsPanel :open="settingsOpen" @close="settingsOpen = false" />
+
+    <div v-if="composeOpen" class="compose-sheet__backdrop" @click.self="closeCompose">
+      <section class="compose-sheet">
+        <header class="compose-sheet__header">
+          <h3>{{ composeTitle }}</h3>
+          <button class="pane-icon-button" type="button" @click="closeCompose" aria-label="Close">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 7l10 10M17 7L7 17" fill="none" stroke="currentColor" stroke-width="1.8" />
+            </svg>
+          </button>
+        </header>
+
+        <form v-if="composeMode === 'feed'" class="compose-sheet__form" @submit.prevent="handleCreateFeed">
+          <label class="compose-field">
+            <span>URL</span>
+            <input v-model="feedFormUrl" type="url" required placeholder="https://example.com" />
+          </label>
+          <label class="compose-field">
+            <span>Name (optional)</span>
+            <input v-model="feedFormName" type="text" placeholder="Feed name" />
+          </label>
+          <label class="compose-field">
+            <span>Category</span>
+            <select v-model="feedFormCategoryId">
+              <option :value="''">Uncategorized</option>
+              <option v-for="category in categoriesSorted" :key="category.id" :value="category.id">
+                {{ category.name }}
+              </option>
+            </select>
+          </label>
+          <p v-if="composeError" class="compose-error">{{ composeError }}</p>
+          <div class="compose-actions">
+            <button class="sidebar-header__button" type="button" @click="closeCompose">Cancel</button>
+            <button class="auth-submit" type="submit" :disabled="composeLoading">{{ composeLoading ? 'Adding…' : 'Add Feed' }}</button>
+          </div>
+        </form>
+
+        <form v-else-if="composeMode === 'clip'" class="compose-sheet__form" @submit.prevent="handleClipArticle">
+          <label class="compose-field">
+            <span>Page URL</span>
+            <input v-model="clipFormUrl" type="url" required placeholder="https://example.com/article" />
+          </label>
+          <div v-if="clipConflict" class="compose-info">
+            <p>This page already exists in <strong>{{ clipConflict.feedName }}</strong>.</p>
+            <p>You can move it into Clips.</p>
+            <div class="compose-actions">
+              <button class="sidebar-header__button" type="button" @click="clipConflict = null">Cancel</button>
+              <button class="auth-submit" type="button" :disabled="composeLoading" @click="handleForceClip">
+                {{ composeLoading ? 'Moving…' : 'Move to Clips' }}
+              </button>
+            </div>
+          </div>
+          <p v-if="composeError" class="compose-error">{{ composeError }}</p>
+          <div v-if="!clipConflict" class="compose-actions">
+            <button class="sidebar-header__button" type="button" @click="closeCompose">Cancel</button>
+            <button class="auth-submit" type="submit" :disabled="composeLoading">{{ composeLoading ? 'Clipping…' : 'Clip Page' }}</button>
+          </div>
+        </form>
+
+        <form v-else class="compose-sheet__form" @submit.prevent="handleCreateCategory">
+          <label class="compose-field">
+            <span>Category Name</span>
+            <input v-model="categoryFormName" type="text" required placeholder="Technology" />
+          </label>
+          <p v-if="composeError" class="compose-error">{{ composeError }}</p>
+          <div class="compose-actions">
+            <button class="sidebar-header__button" type="button" @click="closeCompose">Cancel</button>
+            <button class="auth-submit" type="submit" :disabled="composeLoading">{{ composeLoading ? 'Creating…' : 'Create Category' }}</button>
+          </div>
+        </form>
+      </section>
+    </div>
   </div>
 </template>

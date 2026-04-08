@@ -30,6 +30,10 @@ body,
   overflow: hidden;
 }
 
+html {
+  font-size: 16px;
+}
+
 body {
   color: #2c3440;
   background: #ffffff;
@@ -162,7 +166,7 @@ a {
 
 .reader-shell {
   display: grid;
-  grid-template-columns: 40px 194px 258px minmax(420px, 1fr);
+  grid-template-columns: 56px 194px 258px minmax(420px, 1fr);
   height: 100vh;
   min-height: 0;
   background: #ffffff;
@@ -193,6 +197,10 @@ a {
   justify-items: center;
 }
 
+.mode-rail__menu-anchor {
+  position: relative;
+}
+
 .mode-rail__brand {
   width: 28px;
   height: 28px;
@@ -205,7 +213,18 @@ a {
   font-size: 18px;
 }
 
-.mode-rail__button,
+.mode-rail__button {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #748190;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+}
+
 .pane-icon-button {
   width: 28px;
   height: 28px;
@@ -218,7 +237,11 @@ a {
   border-radius: 6px;
 }
 
-.mode-rail__button svg,
+.mode-rail__button svg {
+  width: 24px;
+  height: 24px;
+}
+
 .pane-icon-button svg,
 .detail-empty-state__icon {
   width: 18px;
@@ -269,7 +292,7 @@ a {
 .pane-title h2,
 .settings-sheet__header h2 {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: #39414f;
 }
@@ -281,7 +304,7 @@ a {
 }
 
 .articles-pane__count {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
 }
 
@@ -296,7 +319,7 @@ a {
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 0 9px;
-  font-size: 12px;
+  font-size: 13px;
   color: #4d5867;
   background: #fafbfd;
   outline: none;
@@ -331,7 +354,7 @@ a {
   background: transparent;
   text-align: left;
   padding: 6px 10px;
-  font-size: 12px;
+  font-size: 13px;
   color: #54606f;
 }
 
@@ -349,7 +372,7 @@ a {
 
 .tree-category strong,
 .tree-feed strong {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: #8b96a4;
 }
@@ -421,22 +444,28 @@ a {
 
 .article-row__meta,
 .detail-surface__meta {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
-.article-row h3,
-.detail-surface h2 {
+.article-row h3 {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.35;
   color: #3d4755;
+}
+
+.detail-surface h2 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.25;
+  color: #2f3946;
 }
 
 .article-row p {
   margin: 0;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 13px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -444,8 +473,22 @@ a {
 }
 
 .article-row__chips span {
-  font-size: 10px;
+  font-size: 11px;
   color: #8a96a4;
+}
+
+.status-chip {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #8a96a4;
+}
+
+.status-chip svg {
+  width: 14px;
+  height: 14px;
 }
 
 .detail-pane {
@@ -492,6 +535,20 @@ a {
   text-decoration: none;
 }
 
+.detail-action--icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.detail-action--icon svg {
+  width: 16px;
+  height: 16px;
+}
+
 .detail-summary {
   margin-bottom: 24px;
   padding: 14px 16px;
@@ -516,8 +573,13 @@ a {
 
 .detail-content {
   color: #36404b;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.7;
+}
+
+.detail-content :where(img, video, iframe) {
+  max-width: 100%;
+  height: auto;
 }
 
 .detail-content :where(h1, h2, h3, h4) {
@@ -544,11 +606,13 @@ a {
   border: 1px solid var(--border);
   box-shadow: 0 18px 40px rgba(18, 33, 55, 0.12);
   padding: 28px 30px;
+  display: flex;
+  flex-direction: column;
 }
 
 .settings-sheet--wide {
   width: min(1180px, 100%);
-  max-height: min(90vh, 960px);
+  height: min(90vh, 960px);
   overflow: hidden;
 }
 
@@ -557,6 +621,7 @@ a {
   grid-template-columns: 190px minmax(0, 1fr);
   gap: 20px;
   margin-top: 18px;
+  flex: 1;
   min-height: 0;
 }
 
@@ -582,6 +647,122 @@ a {
 .settings-body {
   overflow: auto;
   padding-right: 6px;
+}
+
+.quick-add-menu {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 8px);
+  min-width: 160px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(18, 33, 55, 0.12);
+  padding: 4px;
+  z-index: 15;
+}
+
+.quick-add-menu button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #475364;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+
+.quick-add-menu button:hover {
+  background: #f2f6fc;
+}
+
+.compose-sheet__backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(26, 32, 44, 0.22);
+  z-index: 30;
+}
+
+.compose-sheet {
+  width: min(520px, 92vw);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 16px 36px rgba(18, 33, 55, 0.18);
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.compose-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.compose-sheet__header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.compose-sheet__form {
+  display: grid;
+  gap: 12px;
+}
+
+.compose-field {
+  display: grid;
+  gap: 6px;
+}
+
+.compose-field span {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.compose-field input,
+.compose-field select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px 12px;
+  outline: none;
+}
+
+.compose-field input:focus,
+.compose-field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(31, 122, 240, 0.08);
+}
+
+.compose-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.compose-error {
+  margin: 0;
+  font-size: 12px;
+  color: #ad3d3d;
+}
+
+.compose-info {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #f9fbff;
+  display: grid;
+  gap: 8px;
+}
+
+.compose-info p {
+  margin: 0;
+  font-size: 13px;
+  color: #4a5563;
 }
 
 .settings-section {
@@ -683,7 +864,33 @@ a {
 
 @media (max-width: 1200px) {
   .reader-shell {
-    grid-template-columns: 40px 180px 240px minmax(320px, 1fr);
+    grid-template-columns: 48px 180px 240px minmax(320px, 1fr);
+  }
+
+  .mode-rail__button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .mode-rail__button svg {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+@media (max-width: 767px) {
+  .reader-shell {
+    grid-template-columns: 44px 180px 240px minmax(320px, 1fr);
+  }
+
+  .mode-rail__button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .mode-rail__button svg {
+    width: 20px;
+    height: 20px;
   }
 }
 
