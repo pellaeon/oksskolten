@@ -390,6 +390,13 @@ a {
   transform-origin: center;
 }
 
+.feeds-pane__header .pane-icon-button[title='Refresh'] svg,
+.articles-pane__header .pane-icon-button[title='Refresh'] svg {
+  width: 18px;
+  height: 18px;
+  flex-basis: 18px;
+}
+
 .pane-actions--article-controls {
   flex-wrap: nowrap;
   justify-content: flex-end;
