@@ -285,11 +285,15 @@ a {
 }
 
 .mode-rail__button.is-active {
-  background: var(--accent-soft);
+  background: transparent;
   color: var(--accent);
 }
 
-.mode-rail__button:hover,
+.mode-rail__button:hover {
+  color: var(--accent);
+  background: transparent;
+}
+
 .pane-icon-button:hover {
   color: var(--accent);
   background: #eef3fa;
