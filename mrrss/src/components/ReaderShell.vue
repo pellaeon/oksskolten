@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { ArticleDetail, ArticleListItem, Category, FeedWithCounts } from '../../../shared/types'
 import {
   archiveArticleImages,
@@ -54,6 +54,55 @@ const summarizing = ref(false)
 const translating = ref(false)
 const archiving = ref(false)
 const flashMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
+
+function handleKeyDown(event: KeyboardEvent) {
+  if (settingsOpen.value) return
+  if (event.metaKey || event.ctrlKey || event.altKey) return
+
+  const target = event.target as HTMLElement | null
+  if (target && (
+    target.tagName === 'INPUT'
+    || target.tagName === 'TEXTAREA'
+    || target.tagName === 'SELECT'
+    || target.isContentEditable
+  )) {
+    return
+  }
+
+  if (event.key === 'j') {
+    moveSelection(1)
+    event.preventDefault()
+    return
+  }
+
+  if (event.key === 'k') {
+    moveSelection(-1)
+    event.preventDefault()
+    return
+  }
+
+  if (event.key === 'r') {
+    void handleToggleRead()
+    event.preventDefault()
+    return
+  }
+
+  if (event.key === 'f') {
+    void handleToggleLiked()
+    event.preventDefault()
+    return
+  }
+
+  if (event.key === 'l') {
+    void handleToggleBookmarked()
+    event.preventDefault()
+    return
+  }
+
+  if (event.key === 'Escape') {
+    settingsOpen.value = false
+  }
+}
 
 const globalFilters = computed(() => [
   { key: 'all' as const, label: 'All Articles', count: stats.value?.total_articles ?? 0 },
@@ -133,6 +182,12 @@ const currentQuery = computed(() => {
 
 onMounted(async () => {
   await refreshSidebar()
+
+  window.addEventListener('keydown', handleKeyDown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown)
 })
 
 watch(currentQuery, async () => {
@@ -252,6 +307,15 @@ function selectFeed(feedId: number) {
 
 function selectCategory(categoryId: number) {
   selection.value = { kind: 'category', value: categoryId }
+}
+
+function moveSelection(delta: 1 | -1) {
+  if (articles.value.length === 0) return
+  const index = articles.value.findIndex(article => article.url === selectedArticleUrl.value)
+  const nextIndex = index === -1
+    ? 0
+    : Math.min(articles.value.length - 1, Math.max(0, index + delta))
+  selectedArticleUrl.value = articles.value[nextIndex]?.url ?? selectedArticleUrl.value
 }
 
 async function handleToggleRead() {
