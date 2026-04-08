@@ -4,10 +4,23 @@ import { getAuthToken } from './auth'
 export interface AuthMethods {
   setup_required: boolean
   password: { enabled: boolean }
+  passkey?: { enabled: boolean; count: number }
+  github?: { enabled: boolean }
 }
 
 export interface SessionUser {
   email: string
+}
+
+export interface ProfileResponse {
+  account_name: string
+  avatar_seed: string | null
+  language: 'ja' | 'en' | null
+  email?: string
+}
+
+export interface PreferencesResponse {
+  [key: string]: string | null
 }
 
 export interface FeedResponse {
@@ -43,6 +56,52 @@ export interface ArticleQuery {
   limit?: number
   offset?: number
   no_floor?: boolean
+}
+
+export interface ImageStorageResponse {
+  'images.enabled': string | null
+  mode: string
+  url: string
+  headersConfigured: boolean
+  fieldName: string
+  respPath: string
+  healthcheckUrl: string
+  'images.storage_path': string | null
+  'images.max_size_mb': string | null
+}
+
+export interface FreshRssSettings {
+  enabled: boolean
+  endpointUrl: string | null
+  configured: boolean
+  apiKeyConfigured: boolean
+  lastSyncAt: string | null
+  lastSyncError: string | null
+}
+
+export interface ProviderKeyStatus {
+  configured: boolean
+}
+
+export interface RetentionStats {
+  readDays: number
+  unreadDays: number
+  readEligible: number
+  unreadEligible: number
+}
+
+export interface OpmlPreviewFeed {
+  name: string
+  url: string
+  rssUrl: string
+  categoryName: string | null
+  isDuplicate: boolean
+}
+
+export interface OpmlPreviewResponse {
+  feeds: OpmlPreviewFeed[]
+  totalCount: number
+  duplicateCount: number
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
@@ -101,6 +160,28 @@ export function setup(email: string, password: string) {
   return request<{ ok: true; token: string }>('/api/auth/setup', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
+  })
+}
+
+export function getProfile() {
+  return request<ProfileResponse>('/api/settings/profile')
+}
+
+export function updateProfile(body: Partial<ProfileResponse>) {
+  return request<ProfileResponse>('/api/settings/profile', {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
+export function getPreferences() {
+  return request<PreferencesResponse>('/api/settings/preferences')
+}
+
+export function updatePreferences(body: Record<string, string>) {
+  return request<PreferencesResponse>('/api/settings/preferences', {
+    method: 'PATCH',
+    body: JSON.stringify(body),
   })
 }
 
@@ -165,4 +246,146 @@ export function setLiked(articleId: number, liked: boolean) {
     method: 'PATCH',
     body: JSON.stringify({ liked }),
   })
+}
+
+export function getImageStorage() {
+  return request<ImageStorageResponse>('/api/settings/image-storage')
+}
+
+export function updateImageStorage(body: Record<string, string>) {
+  return request<ImageStorageResponse>('/api/settings/image-storage', {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
+export function testImageStorage() {
+  return request<{ success: true; url: string }>('/api/settings/image-storage/test', {
+    method: 'POST',
+  })
+}
+
+export function healthcheckImageStorage() {
+  return request<{ success: true; status: number }>('/api/settings/image-storage/healthcheck', {
+    method: 'POST',
+  })
+}
+
+export function getFreshRssSettings() {
+  return request<FreshRssSettings>('/api/settings/freshrss')
+}
+
+export function updateFreshRssSettings(body: { enabled?: boolean; endpointUrl?: string }) {
+  return request<FreshRssSettings>('/api/settings/freshrss', {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
+export function saveFreshRssApiKey(apiKey: string) {
+  return request<FreshRssSettings>('/api/settings/freshrss/api-key', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey }),
+  })
+}
+
+export function verifyFreshRss() {
+  return request<{ ok: true }>('/api/settings/freshrss/verify', {
+    method: 'POST',
+  })
+}
+
+export function syncFreshRss() {
+  return request<Record<string, unknown>>('/api/settings/freshrss/sync', {
+    method: 'POST',
+  })
+}
+
+export function getProviderKeyStatus(provider: string) {
+  return request<ProviderKeyStatus>(`/api/settings/api-keys/${provider}`)
+}
+
+export function saveProviderApiKey(provider: string, apiKey: string) {
+  return request<{ ok: true; configured: boolean }>(`/api/settings/api-keys/${provider}`, {
+    method: 'POST',
+    body: JSON.stringify({ apiKey }),
+  })
+}
+
+export function getOllamaModels() {
+  return request<{ models: Array<{ name: string; size: number; parameter_size: string }> }>('/api/settings/ollama/models')
+}
+
+export function getOllamaStatus() {
+  return request<{ ok: boolean; version?: string; model_count?: number; error?: string }>('/api/settings/ollama/status')
+}
+
+export function getOpenAIStatus() {
+  return request<{ ok: boolean; model_count?: number; first_model?: string | null; error?: string }>('/api/settings/openai/status')
+}
+
+export function changePassword(body: { currentPassword?: string; newPassword: string }) {
+  return request<{ ok: true; token: string }>('/api/auth/password/change', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export function changeEmail(body: { newEmail: string; currentPassword: string }) {
+  return request<{ ok: true; token: string }>('/api/auth/email/change', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export function togglePasswordAuth(enabled: boolean) {
+  return request<{ ok: true }>('/api/auth/password/toggle', {
+    method: 'POST',
+    body: JSON.stringify({ enabled }),
+  })
+}
+
+export function getRetentionStats() {
+  return request<RetentionStats>('/api/settings/retention/stats')
+}
+
+export function purgeRetention() {
+  return request<{ purged: number }>('/api/settings/retention/purge', {
+    method: 'POST',
+  })
+}
+
+export async function previewOpml(file: File) {
+  const token = getAuthToken()
+  const headers = token ? { Authorization: `Bearer ${token}` } : undefined
+  const form = new FormData()
+  form.append('file', file)
+  const response = await fetch('/api/opml/preview', { method: 'POST', headers, body: form })
+  if (!response.ok) throw new Error(`Preview failed: ${response.status}`)
+  return response.json() as Promise<OpmlPreviewResponse>
+}
+
+export async function importOpml(file: File, selectedUrls?: string[]) {
+  const token = getAuthToken()
+  const headers = token ? { Authorization: `Bearer ${token}` } : undefined
+  const form = new FormData()
+  form.append('file', file)
+  if (selectedUrls) {
+    form.append('selectedUrls', JSON.stringify(selectedUrls))
+  }
+  const response = await fetch('/api/opml', { method: 'POST', headers, body: form })
+  if (!response.ok) throw new Error(`Import failed: ${response.status}`)
+  return response.json() as Promise<{ imported: number; skipped: number; errors: string[] }>
+}
+
+export async function fetchOpmlBlob() {
+  const token = getAuthToken()
+  const headers = token ? { Authorization: `Bearer ${token}` } : undefined
+  const response = await fetch('/api/opml', { headers })
+  if (!response.ok) throw new Error(`Export failed: ${response.status}`)
+  return response.blob()
+}
+
+export function getHealth() {
+  return request<{ gitCommit?: string; gitTag?: string; buildDate?: string; ok: boolean; searchReady: boolean }>('/api/health')
 }

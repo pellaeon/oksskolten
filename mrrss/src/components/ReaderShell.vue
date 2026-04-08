@@ -15,6 +15,7 @@ import {
   type StatsResponse,
 } from '@mrrss/lib/api'
 import ArticleDetailPane from './ArticleDetailPane.vue'
+import SettingsPanel from './SettingsPanel.vue'
 
 type FilterMode = 'all' | 'unread' | 'liked' | 'bookmarked' | 'read' | 'clips'
 type Selection =
@@ -422,20 +423,6 @@ async function handleLogout() {
       @toggle-bookmarked="handleToggleBookmarked"
     />
 
-    <div v-if="settingsOpen" class="settings-sheet__backdrop" @click.self="settingsOpen = false">
-      <section class="settings-sheet">
-        <header class="settings-sheet__header">
-          <div>
-            <p class="pane-header__eyebrow">Settings</p>
-            <h2>Port in progress</h2>
-          </div>
-          <button class="sidebar-header__button" type="button" @click="settingsOpen = false">Close</button>
-        </header>
-        <p>
-          This branch now has the MrRSS-style reader shell on top of the Oksskolten API.
-          The next commits will port the full Oksskolten settings surface into this panel.
-        </p>
-      </section>
-    </div>
+    <SettingsPanel :open="settingsOpen" @close="settingsOpen = false" />
   </div>
 </template>
