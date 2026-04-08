@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import type { ArticleDetail, ArticleListItem, Category, FeedWithCounts } from '../../../shared/types'
 import {
+  archiveArticleImages,
   getArticleByUrl,
   getArticles,
   getCategories,
@@ -12,6 +13,8 @@ import {
   setBookmarked,
   setLiked,
   setSeen,
+  summarizeArticle,
+  translateArticle,
   type StatsResponse,
 } from '@mrrss/lib/api'
 import ArticleDetailPane from './ArticleDetailPane.vue'
@@ -47,6 +50,10 @@ const sidebarError = ref('')
 const articleError = ref('')
 const readRecordedForId = ref<number | null>(null)
 const settingsOpen = ref(false)
+const summarizing = ref(false)
+const translating = ref(false)
+const archiving = ref(false)
+const flashMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
 
 const globalFilters = computed(() => [
   { key: 'all' as const, label: 'All Articles', count: stats.value?.total_articles ?? 0 },
@@ -139,6 +146,13 @@ watch(selectedArticleUrl, async (url) => {
   }
   await loadDetail(url)
 })
+
+function showMessage(type: 'success' | 'error', text: string) {
+  flashMessage.value = { type, text }
+  window.setTimeout(() => {
+    if (flashMessage.value?.text === text) flashMessage.value = null
+  }, 3000)
+}
 
 async function refreshSidebar() {
   sidebarError.value = ''
@@ -282,6 +296,56 @@ async function handleToggleBookmarked() {
   await loadArticles()
 }
 
+async function handleSummarize() {
+  if (!selectedArticle.value || summarizing.value) return
+  summarizing.value = true
+  try {
+    const result = await summarizeArticle(selectedArticle.value.id)
+    selectedArticle.value = { ...selectedArticle.value, summary: result.text }
+    syncArticleIntoList(selectedArticle.value)
+    showMessage('success', 'Article summary updated')
+  } catch (error) {
+    showMessage('error', error instanceof Error ? error.message : 'Summarization failed')
+  } finally {
+    summarizing.value = false
+  }
+}
+
+async function handleTranslate() {
+  if (!selectedArticle.value || translating.value) return
+  translating.value = true
+  try {
+    const result = await translateArticle(selectedArticle.value.id)
+    selectedArticle.value = {
+      ...selectedArticle.value,
+      full_text_translated: result.text,
+      translated_lang: 'configured',
+    }
+    showMessage('success', 'Article translation updated')
+  } catch (error) {
+    showMessage('error', error instanceof Error ? error.message : 'Translation failed')
+  } finally {
+    translating.value = false
+  }
+}
+
+async function handleArchiveImages() {
+  if (!selectedArticle.value || archiving.value) return
+  archiving.value = true
+  try {
+    await archiveArticleImages(selectedArticle.value.id)
+    selectedArticle.value = {
+      ...selectedArticle.value,
+      images_archived_at: new Date().toISOString(),
+    }
+    showMessage('success', 'Image archive job started')
+  } catch (error) {
+    showMessage('error', error instanceof Error ? error.message : 'Image archive failed')
+  } finally {
+    archiving.value = false
+  }
+}
+
 async function handleLogout() {
   try {
     await logout()
@@ -389,6 +453,10 @@ async function handleLogout() {
         <strong>{{ currentCount }}</strong>
       </header>
 
+      <p v-if="flashMessage" class="settings-message" :class="{ 'is-error': flashMessage.type === 'error' }">
+        {{ flashMessage.text }}
+      </p>
+
       <div v-if="articleError" class="pane-state pane-state--error">{{ articleError }}</div>
       <div v-else-if="articleLoading" class="pane-state">Loading articles…</div>
       <div v-else-if="articles.length === 0" class="pane-state">No articles in this view.</div>
@@ -418,9 +486,15 @@ async function handleLogout() {
     <ArticleDetailPane
       :article="selectedArticle"
       :loading="detailLoading"
+      :summarizing="summarizing"
+      :translating="translating"
+      :archiving="archiving"
       @toggle-read="handleToggleRead"
       @toggle-liked="handleToggleLiked"
       @toggle-bookmarked="handleToggleBookmarked"
+      @summarize="handleSummarize"
+      @translate="handleTranslate"
+      @archive-images="handleArchiveImages"
     />
 
     <SettingsPanel :open="settingsOpen" @close="settingsOpen = false" />

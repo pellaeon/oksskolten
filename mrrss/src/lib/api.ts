@@ -248,6 +248,26 @@ export function setLiked(articleId: number, liked: boolean) {
   })
 }
 
+export function summarizeArticle(articleId: number) {
+  return request<{ text: string }>(`/api/articles/${articleId}/summarize`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+}
+
+export function translateArticle(articleId: number) {
+  return request<{ text: string }>(`/api/articles/${articleId}/translate`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+}
+
+export function archiveArticleImages(articleId: number) {
+  return request<{ status: 'accepted' }>(`/api/articles/${articleId}/archive-images`, {
+    method: 'POST',
+  })
+}
+
 export function getImageStorage() {
   return request<ImageStorageResponse>('/api/settings/image-storage')
 }

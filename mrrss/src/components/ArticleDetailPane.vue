@@ -7,17 +7,29 @@ import type { ArticleDetail } from '../../../shared/types'
 const props = defineProps<{
   article: ArticleDetail | null
   loading: boolean
+  summarizing?: boolean
+  translating?: boolean
+  archiving?: boolean
 }>()
 
 const emit = defineEmits<{
   toggleRead: []
   toggleLiked: []
   toggleBookmarked: []
+  summarize: []
+  translate: []
+  archiveImages: []
 }>()
+
+const viewMode = computed(() => {
+  if (!props.article?.full_text_translated) return 'original'
+  return props.article.translated_lang ? 'translated' : 'original'
+})
 
 const renderedContent = computed(() => {
   if (!props.article) return ''
-  const body = props.article.full_text || props.article.excerpt || props.article.summary || ''
+  const translated = viewMode.value === 'translated' ? props.article.full_text_translated : null
+  const body = translated || props.article.full_text || props.article.excerpt || props.article.summary || ''
   if (!body) return '<p class="reader-empty-copy">No article content available.</p>'
   return sanitizeHtml(renderMarkdown(body))
 })
@@ -50,6 +62,21 @@ const isRead = computed(() => Boolean(props.article?.read_at || props.article?.s
           </button>
           <button class="detail-action" :class="{ 'is-active': Boolean(article.bookmarked_at) }" type="button" @click="emit('toggleBookmarked')">
             Read Later
+          </button>
+          <button class="detail-action" type="button" :disabled="summarizing" @click="emit('summarize')">
+            {{ summarizing ? 'Summarizing…' : article.summary ? 'Refresh summary' : 'Summarize' }}
+          </button>
+          <button class="detail-action" type="button" :disabled="translating" @click="emit('translate')">
+            {{ translating ? 'Translating…' : article.full_text_translated ? 'Refresh translation' : 'Translate' }}
+          </button>
+          <button
+            v-if="article.imageArchivingEnabled"
+            class="detail-action"
+            type="button"
+            :disabled="archiving || Boolean(article.images_archived_at)"
+            @click="emit('archiveImages')"
+          >
+            {{ article.images_archived_at ? 'Images archived' : archiving ? 'Archiving…' : 'Archive images' }}
           </button>
           <a class="detail-action detail-action--link" :href="article.url" target="_blank" rel="noreferrer">
             Open original
