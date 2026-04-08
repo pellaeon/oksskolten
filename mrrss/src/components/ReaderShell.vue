@@ -803,6 +803,9 @@ function faviconUrl(rawUrl: string) {
             <rect x="5" y="6" width="12" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8" />
             <path d="M17 10h2.5a1.5 1.5 0 0 1 0 3H17" fill="none" stroke="currentColor" stroke-width="1.8" />
           </svg>
+          <span v-if="filter.key === 'all' && (stats?.unread_articles ?? 0) > 0" class="mode-rail__badge">
+            {{ (stats?.unread_articles ?? 0) > 99 ? '99+' : (stats?.unread_articles ?? 0) }}
+          </span>
         </button>
       </div>
 

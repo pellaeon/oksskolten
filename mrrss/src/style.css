@@ -240,6 +240,7 @@ a {
   display: grid;
   place-items: center;
   border-radius: 6px;
+  position: relative;
 }
 
 .pane-icon-button {
@@ -284,6 +285,24 @@ a {
 .mode-rail__button.is-active {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+.mode-rail__badge {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: #9aa4b2;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .feeds-pane,
