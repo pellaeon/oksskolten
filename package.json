@@ -8,11 +8,13 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:mrrss": "vite --config vite.mrrss.config.ts",
     "dev:demo": "vite --mode demo",
     "dev:server": "NODE_ENV=development tsx watch --env-file-if-exists=.env server/index.ts",
     "dev:server:noauth": "NODE_ENV=development AUTH_DISABLED=1 tsx watch --env-file-if-exists=.env server/index.ts",
     "generate-pwa-assets": "pwa-assets-generator",
     "build": "vite build",
+    "build:mrrss": "vite build --config vite.mrrss.config.ts",
     "build:server": "tsc -p tsconfig.server.json",
     "start": "tsx --env-file-if-exists=.env server/index.ts",
     "lint": "eslint src/ server/ shared/",
@@ -68,6 +70,7 @@
     "tsx": "^4.19.2",
     "turndown": "^7.2.2",
     "typeface-tex-gyre-pagella": "^1.1.13",
+    "vue": "^3.5.13",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -86,6 +89,7 @@
     "@typescript-eslint/parser": "^8.56.1",
     "@vite-pwa/assets-generator": "^1.0.2",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-vue": "^6.0.1",
     "@vitest/coverage-istanbul": "^4.0.18",
     "@vitest/coverage-v8": "^4.0.18",
     "autoprefixer": "^10.4.20",
