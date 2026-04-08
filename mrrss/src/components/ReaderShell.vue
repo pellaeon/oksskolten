@@ -197,6 +197,15 @@ function isMediaCandidate(article: ArticleListItem) {
   return /<img\b|!\[[^\]]*\]\(|\.(png|jpe?g|gif|webp|svg)(\?|$)/i.test(haystack)
 }
 
+function articlePreviewImage(article: ArticleListItem) {
+  const haystack = `${article.summary ?? ''}\n${article.excerpt ?? ''}`
+  const htmlMatch = haystack.match(/<img[^>]+src=['"]([^'"]+)['"]/i)
+  if (htmlMatch?.[1]) return htmlMatch[1]
+  const markdownMatch = haystack.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/i)
+  if (markdownMatch?.[1]) return markdownMatch[1]
+  return ''
+}
+
 const displayedArticles = computed(() => {
   const query = articleSearchQuery.value.trim().toLowerCase()
   return articles.value.filter(article => {
@@ -209,6 +218,7 @@ const displayedArticles = computed(() => {
 })
 
 const currentCount = computed(() => displayedArticles.value.length)
+const isGalleryMode = computed(() => selection.value.kind === 'filter' && selection.value.value === 'gallery')
 
 function showMessage(type: 'success' | 'error', text: string) {
   flashMessage.value = { type, text }
@@ -966,7 +976,29 @@ function faviconUrl(rawUrl: string) {
         <div v-if="articleError" class="pane-flat-state pane-flat-state--error">{{ articleError }}</div>
         <div v-else-if="articleLoading" class="pane-flat-state">Loading articles…</div>
         <div v-else-if="displayedArticles.length === 0" class="pane-flat-state">No articles found.</div>
+        <div v-else-if="isGalleryMode" class="gallery-grid">
+          <button
+            v-for="article in displayedArticles"
+            :key="article.id"
+            class="gallery-card"
+            :class="{ 'is-active': selectedArticleUrl === article.url }"
+            type="button"
+            @click="selectedArticleUrl = article.url"
+          >
+            <img
+              class="gallery-card__image"
+              :src="articlePreviewImage(article) || faviconUrl(article.url)"
+              alt=""
+              loading="lazy"
+            />
+            <div class="gallery-card__meta">
+              <h3>{{ article.title }}</h3>
+              <p>{{ article.feed_name }}</p>
+            </div>
+          </button>
+        </div>
         <button
+          v-else
           v-for="article in displayedArticles"
           :key="article.id"
           class="article-row"
