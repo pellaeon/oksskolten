@@ -54,55 +54,10 @@ const summarizing = ref(false)
 const translating = ref(false)
 const archiving = ref(false)
 const flashMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
+const feedSearchQuery = ref('')
 
-function handleKeyDown(event: KeyboardEvent) {
-  if (settingsOpen.value) return
-  if (event.metaKey || event.ctrlKey || event.altKey) return
-
-  const target = event.target as HTMLElement | null
-  if (target && (
-    target.tagName === 'INPUT'
-    || target.tagName === 'TEXTAREA'
-    || target.tagName === 'SELECT'
-    || target.isContentEditable
-  )) {
-    return
-  }
-
-  if (event.key === 'j') {
-    moveSelection(1)
-    event.preventDefault()
-    return
-  }
-
-  if (event.key === 'k') {
-    moveSelection(-1)
-    event.preventDefault()
-    return
-  }
-
-  if (event.key === 'r') {
-    void handleToggleRead()
-    event.preventDefault()
-    return
-  }
-
-  if (event.key === 'f') {
-    void handleToggleLiked()
-    event.preventDefault()
-    return
-  }
-
-  if (event.key === 'l') {
-    void handleToggleBookmarked()
-    event.preventDefault()
-    return
-  }
-
-  if (event.key === 'Escape') {
-    settingsOpen.value = false
-  }
-}
+const deferredUnreadAutoReadIds = new Set<number>()
+const deferredUnreadManualReadIds = new Set<number>()
 
 const globalFilters = computed(() => [
   { key: 'all' as const, label: 'All Articles', count: stats.value?.total_articles ?? 0 },
@@ -143,6 +98,29 @@ const groupedFeeds = computed(() => {
   }
 })
 
+const filteredGroupedFeeds = computed(() => {
+  const query = feedSearchQuery.value.trim().toLowerCase()
+  if (!query) return groupedFeeds.value.categories
+
+  return groupedFeeds.value.categories
+    .map(group => ({
+      category: group.category,
+      feeds: group.feeds.filter(feed =>
+        feed.name.toLowerCase().includes(query) || feed.url.toLowerCase().includes(query),
+      ),
+    }))
+    .filter(group => group.feeds.length > 0 || group.category.name.toLowerCase().includes(query))
+})
+
+const filteredUncategorizedFeeds = computed(() => {
+  const query = feedSearchQuery.value.trim().toLowerCase()
+  if (!query) return groupedFeeds.value.uncategorized
+
+  return groupedFeeds.value.uncategorized.filter(feed =>
+    feed.name.toLowerCase().includes(query) || feed.url.toLowerCase().includes(query),
+  )
+})
+
 const currentLabel = computed(() => {
   if (selection.value.kind === 'filter') {
     return globalFilters.value.find(filter => filter.key === selection.value.value)?.label ?? 'All Articles'
@@ -154,6 +132,7 @@ const currentLabel = computed(() => {
 })
 
 const currentCount = computed(() => totalArticles.value)
+const isUnreadMode = computed(() => selection.value.kind === 'filter' && selection.value.value === 'unread')
 
 const currentQuery = computed(() => {
   if (selection.value.kind === 'filter') {
@@ -180,9 +159,68 @@ const currentQuery = computed(() => {
   return { category_id: selection.value.value, limit: 100, no_floor: true }
 })
 
+function showMessage(type: 'success' | 'error', text: string) {
+  flashMessage.value = { type, text }
+  window.setTimeout(() => {
+    if (flashMessage.value?.text === text) flashMessage.value = null
+  }, 2500)
+}
+
+function moveSelection(delta: 1 | -1) {
+  if (articles.value.length === 0) return
+  const index = articles.value.findIndex(article => article.url === selectedArticleUrl.value)
+  const nextIndex = index === -1
+    ? 0
+    : Math.min(articles.value.length - 1, Math.max(0, index + delta))
+  selectedArticleUrl.value = articles.value[nextIndex]?.url ?? selectedArticleUrl.value
+}
+
+function handleKeyDown(event: KeyboardEvent) {
+  if (settingsOpen.value) {
+    if (event.key === 'Escape') settingsOpen.value = false
+    return
+  }
+  if (event.metaKey || event.ctrlKey || event.altKey) return
+
+  const target = event.target as HTMLElement | null
+  if (target && (
+    target.tagName === 'INPUT'
+    || target.tagName === 'TEXTAREA'
+    || target.tagName === 'SELECT'
+    || target.isContentEditable
+  )) {
+    return
+  }
+
+  if (event.key === 'j') {
+    moveSelection(1)
+    event.preventDefault()
+    return
+  }
+  if (event.key === 'k') {
+    moveSelection(-1)
+    event.preventDefault()
+    return
+  }
+  if (event.key === 'r') {
+    void handleToggleRead()
+    event.preventDefault()
+    return
+  }
+  if (event.key === 'f') {
+    void handleToggleLiked()
+    event.preventDefault()
+    return
+  }
+  if (event.key === 'l') {
+    void handleToggleBookmarked()
+    event.preventDefault()
+    return
+  }
+}
+
 onMounted(async () => {
   await refreshSidebar()
-
   window.addEventListener('keydown', handleKeyDown)
 })
 
@@ -201,13 +239,6 @@ watch(selectedArticleUrl, async (url) => {
   }
   await loadDetail(url)
 })
-
-function showMessage(type: 'success' | 'error', text: string) {
-  flashMessage.value = { type, text }
-  window.setTimeout(() => {
-    if (flashMessage.value?.text === text) flashMessage.value = null
-  }, 3000)
-}
 
 async function refreshSidebar() {
   sidebarError.value = ''
@@ -241,11 +272,19 @@ async function loadArticles() {
 
   try {
     const data = await getArticles(currentQuery.value)
-    articles.value = data.articles
+    articles.value = data.articles.map(article => {
+      if (!deferredUnreadManualReadIds.has(article.id)) return article
+      const now = new Date().toISOString()
+      return {
+        ...article,
+        seen_at: article.seen_at ?? now,
+        read_at: article.read_at ?? now,
+      }
+    })
     totalArticles.value = data.total
 
-    if (!selectedArticleUrl.value || !data.articles.some(article => article.url === selectedArticleUrl.value)) {
-      selectedArticleUrl.value = data.articles[0]?.url ?? null
+    if (selectedArticleUrl.value && !data.articles.some(article => article.url === selectedArticleUrl.value)) {
+      selectedArticleUrl.value = null
     }
   } catch (err) {
     articleError.value = err instanceof Error ? err.message : 'Failed to load articles.'
@@ -261,8 +300,20 @@ async function loadDetail(url: string) {
   detailLoading.value = true
   try {
     const article = await getArticleByUrl(url)
-    selectedArticle.value = article
-    syncArticleIntoList(article)
+    const deferredRead = deferredUnreadManualReadIds.has(article.id)
+    selectedArticle.value = deferredRead
+      ? {
+          ...article,
+          seen_at: article.seen_at ?? new Date().toISOString(),
+          read_at: article.read_at ?? new Date().toISOString(),
+        }
+      : article
+    syncArticleIntoList(selectedArticle.value)
+
+    if (isUnreadMode.value && article.seen_at == null && article.read_at == null) {
+      deferredUnreadAutoReadIds.add(article.id)
+      return
+    }
 
     if ((article.seen_at == null || article.read_at == null) && readRecordedForId.value !== article.id) {
       readRecordedForId.value = article.id
@@ -297,31 +348,67 @@ function syncArticleIntoList(article: ArticleDetail | null) {
   } : item)
 }
 
-function selectFilter(filter: FilterMode) {
+async function flushDeferredUnreadReads() {
+  const ids = new Set<number>([
+    ...deferredUnreadAutoReadIds,
+    ...deferredUnreadManualReadIds,
+  ])
+  if (ids.size === 0) return
+
+  await Promise.all(Array.from(ids).map(async (id) => {
+    try {
+      await recordRead(id)
+    } catch {
+      // keep mode changes resilient if one read update fails
+    }
+  }))
+
+  deferredUnreadAutoReadIds.clear()
+  deferredUnreadManualReadIds.clear()
+  await refreshSidebar()
+}
+
+async function selectFilter(filter: FilterMode) {
+  if (isUnreadMode.value && filter !== 'unread') {
+    await flushDeferredUnreadReads()
+  }
   selection.value = { kind: 'filter', value: filter }
 }
 
-function selectFeed(feedId: number) {
+async function selectFeed(feedId: number) {
+  if (isUnreadMode.value) {
+    await flushDeferredUnreadReads()
+  }
   selection.value = { kind: 'feed', value: feedId }
 }
 
-function selectCategory(categoryId: number) {
+async function selectCategory(categoryId: number) {
+  if (isUnreadMode.value) {
+    await flushDeferredUnreadReads()
+  }
   selection.value = { kind: 'category', value: categoryId }
-}
-
-function moveSelection(delta: 1 | -1) {
-  if (articles.value.length === 0) return
-  const index = articles.value.findIndex(article => article.url === selectedArticleUrl.value)
-  const nextIndex = index === -1
-    ? 0
-    : Math.min(articles.value.length - 1, Math.max(0, index + delta))
-  selectedArticleUrl.value = articles.value[nextIndex]?.url ?? selectedArticleUrl.value
 }
 
 async function handleToggleRead() {
   if (!selectedArticle.value) return
   const article = selectedArticle.value
   const markUnread = Boolean(article.read_at || article.seen_at)
+
+  if (isUnreadMode.value) {
+    if (markUnread) {
+      deferredUnreadManualReadIds.delete(article.id)
+      deferredUnreadAutoReadIds.delete(article.id)
+      selectedArticle.value = { ...article, seen_at: null, read_at: null }
+    } else {
+      deferredUnreadManualReadIds.add(article.id)
+      deferredUnreadAutoReadIds.delete(article.id)
+      const now = new Date().toISOString()
+      selectedArticle.value = { ...article, seen_at: now, read_at: now }
+    }
+
+    syncArticleIntoList(selectedArticle.value)
+    return
+  }
 
   if (markUnread) {
     const result = await setSeen(article.id, false)
@@ -418,133 +505,209 @@ async function handleLogout() {
   }
   emit('logout')
 }
+
+function filterIconName(filter: FilterMode) {
+  switch (filter) {
+    case 'all': return 'grid'
+    case 'unread': return 'inbox'
+    case 'liked': return 'star'
+    case 'bookmarked': return 'bookmark'
+    case 'read': return 'clock'
+    case 'clips': return 'clip'
+  }
+}
+
+function faviconUrl(rawUrl: string) {
+  try {
+    const hostname = new URL(rawUrl).hostname
+    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=32`
+  } catch {
+    return ''
+  }
+}
 </script>
 
 <template>
   <div class="reader-shell">
-    <aside class="reader-sidebar">
-      <div class="reader-sidebar__header">
-        <div>
-          <p class="reader-sidebar__eyebrow">Alternative Frontend</p>
-          <h1>Oksskolten</h1>
-        </div>
-        <button class="sidebar-header__button" type="button" @click="settingsOpen = true">Settings</button>
-      </div>
-
-      <section class="sidebar-section">
-        <h2>Filters</h2>
+    <nav class="mode-rail">
+      <div class="mode-rail__top">
+        <div class="mode-rail__brand">N</div>
         <button
           v-for="filter in globalFilters"
           :key="filter.key"
-          class="sidebar-filter"
+          class="mode-rail__button"
           :class="{ 'is-active': selection.kind === 'filter' && selection.value === filter.key }"
           type="button"
+          :title="filter.label"
           @click="selectFilter(filter.key)"
         >
-          <span>{{ filter.label }}</span>
-          <strong>{{ filter.count }}</strong>
+          <svg v-if="filterIconName(filter.key) === 'grid'" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="4" width="6" height="6" rx="1.2" />
+            <rect x="14" y="4" width="6" height="6" rx="1.2" />
+            <rect x="4" y="14" width="6" height="6" rx="1.2" />
+            <rect x="14" y="14" width="6" height="6" rx="1.2" />
+          </svg>
+          <svg v-else-if="filterIconName(filter.key) === 'inbox'" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 5h16v12H4z" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path d="M4 14h4l2 3h4l2-3h4" fill="none" stroke="currentColor" stroke-width="1.8" />
+          </svg>
+          <svg v-else-if="filterIconName(filter.key) === 'star'" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m12 4 2.5 5.2 5.7.8-4.1 4 1 5.8L12 17l-5.1 2.8 1-5.8-4.1-4 5.7-.8z" fill="none" stroke="currentColor" stroke-width="1.8" />
+          </svg>
+          <svg v-else-if="filterIconName(filter.key) === 'bookmark'" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7 4h10v16l-5-3-5 3z" fill="none" stroke="currentColor" stroke-width="1.8" />
+          </svg>
+          <svg v-else-if="filterIconName(filter.key) === 'clock'" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path d="M12 8v5l3 2" fill="none" stroke="currentColor" stroke-width="1.8" />
+          </svg>
+          <svg v-else viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="5" y="6" width="12" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path d="M17 10h2.5a1.5 1.5 0 0 1 0 3H17" fill="none" stroke="currentColor" stroke-width="1.8" />
+          </svg>
         </button>
-      </section>
+      </div>
 
-      <section class="sidebar-section sidebar-section--tree">
-        <div class="sidebar-section__heading">
+      <div class="mode-rail__bottom">
+        <button class="mode-rail__button" type="button" title="Settings" @click="settingsOpen = true">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 8.6A3.4 3.4 0 1 0 12 15.4 3.4 3.4 0 1 0 12 8.6z" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path d="M4.5 13.2v-2.4l2-.6.5-1.2-1-1.9 1.7-1.7 1.9 1 .2-.1 1-.4.6-2h2.4l.6 2 1.2.5 1.9-1 1.7 1.7-1 1.9.5 1.2 2 .6v2.4l-2 .6-.5 1.2 1 1.9-1.7 1.7-1.9-1-1.2.5-.6 2h-2.4l-.6-2-1.2-.5-1.9 1-1.7-1.7 1-1.9-.5-1.2z" fill="none" stroke="currentColor" stroke-width="1.2" />
+          </svg>
+        </button>
+        <button class="mode-rail__button" type="button" title="Log out" @click="handleLogout">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M10 6H6v12h4" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path d="M13 8l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path d="M9 12h8" fill="none" stroke="currentColor" stroke-width="1.8" />
+          </svg>
+        </button>
+      </div>
+    </nav>
+
+    <aside class="feeds-pane">
+      <header class="feeds-pane__header">
+        <div class="pane-title">
           <h2>Feeds</h2>
-          <span>{{ feeds.length }}</span>
         </div>
+        <div class="pane-actions">
+          <button class="pane-icon-button" type="button" title="Refresh" @click="refreshSidebar">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 6v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" />
+              <path d="M20 11a8 8 0 1 0 2 5.3" fill="none" stroke="currentColor" stroke-width="1.8" />
+            </svg>
+          </button>
+        </div>
+      </header>
 
-        <p v-if="sidebarLoading" class="sidebar-state">Loading feeds…</p>
-        <p v-else-if="sidebarError" class="sidebar-state sidebar-state--error">{{ sidebarError }}</p>
+      <div class="feeds-pane__search">
+        <input v-model="feedSearchQuery" type="text" placeholder="Search feeds..." />
+      </div>
+
+      <section class="feeds-tree">
+        <p v-if="sidebarLoading" class="pane-flat-state">Loading feeds…</p>
+        <p v-else-if="sidebarError" class="pane-flat-state pane-flat-state--error">{{ sidebarError }}</p>
         <template v-else>
           <div
-            v-for="group in groupedFeeds.categories"
+            v-for="group in filteredGroupedFeeds"
             :key="group.category.id"
-            class="feed-group"
+            class="tree-group"
           >
             <button
-              class="feed-group__category"
+              class="tree-category"
               :class="{ 'is-active': selection.kind === 'category' && selection.value === group.category.id }"
               type="button"
               @click="selectCategory(group.category.id)"
             >
-              <span>{{ group.category.name }}</span>
+              <span class="tree-label">{{ group.category.name }}</span>
               <strong>{{ group.feeds.reduce((total, feed) => total + feed.unread_count, 0) }}</strong>
             </button>
             <button
               v-for="feed in group.feeds"
               :key="feed.id"
-              class="feed-row"
+              class="tree-feed"
               :class="{ 'is-active': selection.kind === 'feed' && selection.value === feed.id }"
               type="button"
               @click="selectFeed(feed.id)"
             >
-              <span>{{ feed.name }}</span>
+              <span class="tree-feed__main">
+                <img class="favicon" :src="faviconUrl(feed.url)" alt="" loading="lazy" />
+                <span class="tree-label">{{ feed.name }}</span>
+              </span>
               <strong>{{ feed.unread_count }}</strong>
             </button>
           </div>
 
-          <div v-if="groupedFeeds.uncategorized.length > 0" class="feed-group">
-            <p class="feed-group__label">Uncategorized</p>
+          <div v-if="filteredUncategorizedFeeds.length > 0" class="tree-group">
+            <p class="tree-group__label">Uncategorized</p>
             <button
-              v-for="feed in groupedFeeds.uncategorized"
+              v-for="feed in filteredUncategorizedFeeds"
               :key="feed.id"
-              class="feed-row"
+              class="tree-feed"
               :class="{ 'is-active': selection.kind === 'feed' && selection.value === feed.id }"
               type="button"
               @click="selectFeed(feed.id)"
             >
-              <span>{{ feed.name }}</span>
+              <span class="tree-feed__main">
+                <img class="favicon" :src="faviconUrl(feed.url)" alt="" loading="lazy" />
+                <span class="tree-label">{{ feed.name }}</span>
+              </span>
               <strong>{{ feed.unread_count }}</strong>
             </button>
           </div>
         </template>
       </section>
-
-      <footer class="reader-sidebar__footer">
-        <div>
-          <p class="reader-sidebar__eyebrow">Signed in as</p>
-          <strong>{{ email }}</strong>
-        </div>
-        <button class="sidebar-header__button" type="button" @click="handleLogout">Log out</button>
-      </footer>
     </aside>
 
-    <main class="reader-list-pane">
-      <header class="pane-header">
-        <div>
-          <p class="pane-header__eyebrow">Current View</p>
+    <main class="articles-pane">
+      <header class="articles-pane__header">
+        <div class="pane-title">
           <h2>{{ currentLabel }}</h2>
         </div>
-        <strong>{{ currentCount }}</strong>
+        <div class="pane-actions">
+          <span class="articles-pane__count">{{ currentCount }}</span>
+          <button class="pane-icon-button" type="button" title="Refresh" @click="loadArticles">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 6v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" />
+              <path d="M20 11a8 8 0 1 0 2 5.3" fill="none" stroke="currentColor" stroke-width="1.8" />
+            </svg>
+          </button>
+        </div>
       </header>
 
       <p v-if="flashMessage" class="settings-message" :class="{ 'is-error': flashMessage.type === 'error' }">
         {{ flashMessage.text }}
       </p>
 
-      <div v-if="articleError" class="pane-state pane-state--error">{{ articleError }}</div>
-      <div v-else-if="articleLoading" class="pane-state">Loading articles…</div>
-      <div v-else-if="articles.length === 0" class="pane-state">No articles in this view.</div>
-      <button
-        v-for="article in articles"
-        :key="article.id"
-        class="article-row"
-        :class="{ 'is-active': selectedArticleUrl === article.url, 'is-unread': !article.seen_at }"
-        type="button"
-        @click="selectedArticleUrl = article.url"
-      >
-        <div class="article-row__meta">
-          <span>{{ article.feed_name }}</span>
-          <span>{{ article.published_at ? new Date(article.published_at).toLocaleDateString() : 'No date' }}</span>
-        </div>
-        <h3>{{ article.title }}</h3>
-        <p>{{ article.excerpt || article.summary || 'No preview available.' }}</p>
-        <div class="article-row__chips">
-          <span v-if="article.liked_at">Liked</span>
-          <span v-if="article.bookmarked_at">Read Later</span>
-          <span v-if="article.read_at">Read</span>
-          <span v-if="!article.seen_at">Unread</span>
-        </div>
-      </button>
+      <div class="articles-pane__list">
+        <div v-if="articleError" class="pane-flat-state pane-flat-state--error">{{ articleError }}</div>
+        <div v-else-if="articleLoading" class="pane-flat-state">Loading articles…</div>
+        <div v-else-if="articles.length === 0" class="pane-flat-state">No articles found.</div>
+        <button
+          v-for="article in articles"
+          :key="article.id"
+          class="article-row"
+          :class="{ 'is-active': selectedArticleUrl === article.url, 'is-unread': !article.seen_at }"
+          type="button"
+          @click="selectedArticleUrl = article.url"
+        >
+          <div class="article-row__meta">
+            <span class="article-row__feed">
+              <img class="favicon" :src="faviconUrl(article.url)" alt="" loading="lazy" />
+              <span>{{ article.feed_name }}</span>
+            </span>
+            <span>{{ article.published_at ? new Date(article.published_at).toLocaleDateString() : 'No date' }}</span>
+          </div>
+          <h3>{{ article.title }}</h3>
+          <p>{{ article.excerpt || article.summary || 'No preview available.' }}</p>
+          <div class="article-row__chips">
+            <span v-if="article.liked_at">Liked</span>
+            <span v-if="article.bookmarked_at">Read Later</span>
+            <span v-if="article.read_at">Read</span>
+            <span v-if="!article.seen_at">Unread</span>
+          </div>
+        </button>
+      </div>
     </main>
 
     <ArticleDetailPane

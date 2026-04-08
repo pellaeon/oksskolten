@@ -21,15 +21,9 @@ const emit = defineEmits<{
   archiveImages: []
 }>()
 
-const viewMode = computed(() => {
-  if (!props.article?.full_text_translated) return 'original'
-  return props.article.translated_lang ? 'translated' : 'original'
-})
-
 const renderedContent = computed(() => {
   if (!props.article) return ''
-  const translated = viewMode.value === 'translated' ? props.article.full_text_translated : null
-  const body = translated || props.article.full_text || props.article.excerpt || props.article.summary || ''
+  const body = props.article.full_text_translated || props.article.full_text || props.article.excerpt || props.article.summary || ''
   if (!body) return '<p class="reader-empty-copy">No article content available.</p>'
   return sanitizeHtml(renderMarkdown(body))
 })
@@ -44,11 +38,18 @@ const isRead = computed(() => Boolean(props.article?.read_at || props.article?.s
 
 <template>
   <section class="detail-pane">
-    <div v-if="loading" class="detail-state">Loading article…</div>
-    <div v-else-if="!article" class="detail-state">Select an article to open it here.</div>
-    <article v-else class="detail-card">
-      <header class="detail-card__header">
-        <p class="detail-card__meta">
+    <div v-if="loading" class="detail-empty-state">Loading article…</div>
+    <div v-else-if="!article" class="detail-empty-state">
+      <svg class="detail-empty-state__icon" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="4" y="6" width="14" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6" />
+        <path d="M8 10h6M8 13h6" fill="none" stroke="currentColor" stroke-width="1.6" />
+        <path d="M18 9h2v10H6v-1" fill="none" stroke="currentColor" stroke-width="1.6" />
+      </svg>
+      <p>Select an article to start reading</p>
+    </div>
+    <article v-else class="detail-surface">
+      <header class="detail-surface__header">
+        <p class="detail-surface__meta">
           <span>{{ article.feed_name }}</span>
           <span>{{ publishedAt }}</span>
         </p>
