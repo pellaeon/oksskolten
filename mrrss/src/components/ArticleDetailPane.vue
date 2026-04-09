@@ -92,11 +92,43 @@ const isRead = computed(() => Boolean(props.article?.read_at || props.article?.s
               <path d="M7 4h10v16l-5-3-5 3z" fill="none" stroke="currentColor" stroke-width="1.8" />
             </svg>
           </button>
-          <button class="detail-action" type="button" :disabled="summarizing" @click="emit('summarize')">
-            {{ summarizing ? 'Summarizing…' : article.summary ? 'Refresh summary' : 'Summarize' }}
+          <button
+            class="detail-action detail-action--icon"
+            :class="{ 'is-active': Boolean(article.summary) }"
+            type="button"
+            :disabled="summarizing"
+            :title="summarizing ? 'Summarizing…' : article.summary ? 'Refresh summary' : 'Summarize'"
+            :aria-label="summarizing ? 'Summarizing…' : article.summary ? 'Refresh summary' : 'Summarize'"
+            @click="emit('summarize')"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M9.94 15.5a2 2 0 0 0-1.44-1.44l-6-1.5a2 2 0 0 1 0-3.12l6-1.5a2 2 0 0 0 1.44-1.44l1.5-6a2 2 0 0 1 3.12 0l1.5 6a2 2 0 0 0 1.44 1.44l6 1.5a2 2 0 0 1 0 3.12l-6 1.5a2 2 0 0 0-1.44 1.44l-1.5 6a2 2 0 0 1-3.12 0z"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
           </button>
-          <button class="detail-action" type="button" :disabled="translating" @click="emit('translate')">
-            {{ translating ? 'Translating…' : article.full_text_translated ? 'Refresh translation' : 'Translate' }}
+          <button
+            class="detail-action detail-action--icon"
+            :class="{ 'is-active': Boolean(article.full_text_translated) }"
+            type="button"
+            :disabled="translating"
+            :title="translating ? 'Translating…' : article.full_text_translated ? 'Refresh translation' : 'Translate'"
+            :aria-label="translating ? 'Translating…' : article.full_text_translated ? 'Refresh translation' : 'Translate'"
+            @click="emit('translate')"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m5 8 6 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="m4 14 6-6 2-3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M2 5h12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M7 2h1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="m22 22-5-10-5 10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M14 18h6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
           </button>
           <button
             v-if="article.imageArchivingEnabled"
