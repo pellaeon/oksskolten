@@ -251,19 +251,48 @@ function ProviderButtons({ providers, selected, onSelect, t, configuredKeys }: {
 }
 
 function ModelSelect({ provider, modelValue, setModel, t }: { provider: string; modelValue: string; setModel: (v: string) => void; t: TFunc }) {
-  // Ollama: fetch dynamic model list
-  const { data: ollamaModels } = useSWR<{ models: Array<{ name: string; size: number; parameter_size: string }> }>(
-    provider === 'ollama' ? '/api/settings/ollama/models' : null,
-    fetcher,
-    { revalidateOnFocus: false },
-  )
+  const [dynamicModels, setDynamicModels] = useState<Array<{ value: string; label: string }> | null>(null)
+  const [dynamicLoading, setDynamicLoading] = useState(false)
+  const [loadedProvider, setLoadedProvider] = useState<string | null>(null)
 
-  // Auto-select first Ollama model when switching to ollama and no model is set
   useEffect(() => {
-    if (provider === 'ollama' && ollamaModels?.models?.length && !modelValue) {
-      setModel(ollamaModels.models[0].name)
+    setDynamicModels(null)
+    setDynamicLoading(false)
+    setLoadedProvider(null)
+  }, [provider])
+
+  async function loadDynamicModelsIfNeeded() {
+    if ((provider !== 'ollama' && provider !== 'openai') || dynamicLoading) return
+    if (loadedProvider === provider) return
+
+    setDynamicLoading(true)
+    try {
+      if (provider === 'ollama') {
+        const res = await fetcher('/api/settings/ollama/models') as {
+          models: Array<{ name: string; size: number; parameter_size: string }>
+        }
+        const mapped = (res.models || []).map(m => ({
+          value: m.name,
+          label: m.parameter_size ? `${m.name} (${m.parameter_size})` : m.name,
+        }))
+        setDynamicModels(mapped)
+        if (!modelValue && mapped[0]) setModel(mapped[0].value)
+      } else {
+        const res = await fetcher('/api/settings/openai/models') as { models: Array<{ id: string }> }
+        const mapped = (res.models || [])
+          .map(m => m.id)
+          .filter(Boolean)
+          .map(id => ({ value: id, label: id }))
+        // OpenAI fallback: if probe fails/empty, keep hard-coded list by leaving dynamicModels null.
+        setDynamicModels(mapped.length > 0 ? mapped : null)
+      }
+    } catch {
+      setDynamicModels(null)
+    } finally {
+      setLoadedProvider(provider)
+      setDynamicLoading(false)
     }
-  }, [provider, ollamaModels, modelValue, setModel])
+  }
 
   if (!provider) {
     return (
@@ -276,30 +305,52 @@ function ModelSelect({ provider, modelValue, setModel, t }: { provider: string; 
     )
   }
 
-  if (provider === 'ollama') {
-    const models = ollamaModels?.models || []
-    if (models.length === 0) {
-      return (
-        <Select disabled>
-          <SelectTrigger>
-            <SelectValue placeholder={t('ollama.noModels')} />
-          </SelectTrigger>
-          <SelectContent />
-        </Select>
-      )
-    }
+  if (provider === 'openai') {
+    const staticGroups = getModelGroups(provider)
+    const usingDynamic = !!dynamicModels?.length
     return (
-      <Select value={modelValue || undefined} onValueChange={setModel}>
+      <Select value={modelValue || undefined} onValueChange={setModel} onOpenChange={(open) => { if (open) void loadDynamicModelsIfNeeded() }}>
         <SelectTrigger>
-          <SelectValue placeholder={t('integration.selectModel')} />
+          <SelectValue placeholder={dynamicLoading ? 'Loading models...' : t('integration.selectModel')} />
+        </SelectTrigger>
+        <SelectContent>
+          {usingDynamic ? (
+            <SelectGroup>
+              {dynamicModels.map(m => (
+                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+              ))}
+            </SelectGroup>
+          ) : (
+            staticGroups.map(group => (
+              <SelectGroup key={group.group}>
+                <SelectLabel>{group.group}</SelectLabel>
+                {group.models.map(m => (
+                  <SelectItem key={m.value} value={m.value}>{m.label} ({m.value})</SelectItem>
+                ))}
+              </SelectGroup>
+            ))
+          )}
+        </SelectContent>
+      </Select>
+    )
+  }
+
+  if (provider === 'ollama') {
+    const models = dynamicModels || []
+    return (
+      <Select value={modelValue || undefined} onValueChange={setModel} onOpenChange={(open) => { if (open) void loadDynamicModelsIfNeeded() }}>
+        <SelectTrigger>
+          <SelectValue placeholder={models.length === 0 ? (dynamicLoading ? 'Loading models...' : t('ollama.noModels')) : t('integration.selectModel')} />
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            {models.map(m => (
-              <SelectItem key={m.name} value={m.name}>
-                {m.name}{m.parameter_size ? ` (${m.parameter_size})` : ''}
-              </SelectItem>
-            ))}
+            {models.length === 0
+              ? <SelectItem value="__no_models__" disabled>{dynamicLoading ? 'Loading models...' : t('ollama.noModels')}</SelectItem>
+              : models.map(m => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
+              ))}
           </SelectGroup>
         </SelectContent>
       </Select>
