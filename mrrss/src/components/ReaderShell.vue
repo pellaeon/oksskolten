@@ -361,6 +361,7 @@ watch(selectedArticleUrl, async (url) => {
 
 watch(displayedArticles, (next) => {
   if (!selectedArticleUrl.value) return
+  if (showOnlyUnreadInList.value) return
   if (!next.some(article => article.url === selectedArticleUrl.value)) {
     selectedArticleUrl.value = next[0]?.url ?? null
   }
@@ -379,6 +380,12 @@ watch(
     }, 300)
   },
 )
+
+watch(showOnlyUnreadInList, async (enabled, previous) => {
+  if (previous && !enabled && !isUnreadMode.value) {
+    await flushDeferredUnreadReads()
+  }
+})
 
 async function refreshSidebar(silent = false) {
   if (!silent) {
@@ -552,7 +559,7 @@ async function loadDetail(url: string) {
       : article
     syncArticleIntoList(selectedArticle.value)
 
-    if (isUnreadMode.value && article.seen_at == null && article.read_at == null) {
+    if ((isUnreadMode.value || showOnlyUnreadInList.value) && article.seen_at == null && article.read_at == null) {
       deferredUnreadAutoReadIds.add(article.id)
       return
     }
@@ -780,6 +787,12 @@ function toggleFeedList() {
 function toggleActivityBar() {
   activityBarCollapsed.value = !activityBarCollapsed.value
   localStorage.setItem('mrrss.activity-collapsed', String(activityBarCollapsed.value))
+}
+
+function isArticleVisuallyRead(article: ArticleListItem) {
+  return Boolean(article.seen_at || article.read_at)
+    || deferredUnreadAutoReadIds.has(article.id)
+    || deferredUnreadManualReadIds.has(article.id)
 }
 
 function buildSearchSince() {
@@ -1347,7 +1360,7 @@ function scheduleHideArticleListScrollbar() {
           v-for="article in displayedArticles"
           :key="article.id"
           class="article-row"
-          :class="{ 'is-active': selectedArticleUrl === article.url, 'is-read': Boolean(article.seen_at || article.read_at) }"
+          :class="{ 'is-active': selectedArticleUrl === article.url, 'is-read': isArticleVisuallyRead(article) }"
           type="button"
           @click="selectedArticleUrl = article.url"
         >
