@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { ArticleDetail, ArticleListItem, Category, FeedWithCounts } from '../../../shared/types'
+import { findArticleFont } from '../../../src/data/articleFonts'
 import {
   ApiRequestError,
   archiveArticleImages,
@@ -11,6 +12,7 @@ import {
   getArticles,
   getCategories,
   getFeeds,
+  getPreferences,
   getStats,
   markCategoryAllSeen,
   markFeedAllSeen,
@@ -105,6 +107,7 @@ const updatingAllFeeds = ref(false)
 
 const deferredUnreadAutoReadIds = new Set<number>()
 const deferredUnreadManualReadIds = new Set<number>()
+const ARTICLE_FONT_LINK_ID = 'mrrss-article-font-link'
 
 const globalFilters = computed(() => [
   { key: 'all' as const, label: 'All Articles', count: stats.value?.total_articles ?? 0 },
@@ -321,6 +324,7 @@ onMounted(async () => {
   activityBarCollapsed.value = localStorage.getItem('mrrss.activity-collapsed') === 'true'
   const storedFeedExpanded = localStorage.getItem('mrrss.feed-expanded')
   feedListExpanded.value = storedFeedExpanded == null ? true : storedFeedExpanded === 'true'
+  await applyArticleFontPreference()
   await refreshSidebar()
   window.addEventListener('keydown', handleKeyDown)
 })
@@ -388,6 +392,38 @@ watch(showOnlyUnreadInList, async (enabled, previous) => {
     await flushDeferredUnreadReads()
   }
 })
+
+watch(settingsOpen, (open, previous) => {
+  if (previous && !open) {
+    void applyArticleFontPreference()
+  }
+})
+
+async function applyArticleFontPreference() {
+  try {
+    const prefs = await getPreferences()
+    const font = findArticleFont(prefs['appearance.font_family'] ?? 'system')
+    document.documentElement.style.setProperty('--mrrss-article-font', font.family)
+
+    const existing = document.getElementById(ARTICLE_FONT_LINK_ID) as HTMLLinkElement | null
+    if (font.googleFontsUrl) {
+      if (existing) {
+        existing.href = font.googleFontsUrl
+      } else {
+        const link = document.createElement('link')
+        link.id = ARTICLE_FONT_LINK_ID
+        link.rel = 'stylesheet'
+        link.href = font.googleFontsUrl
+        document.head.appendChild(link)
+      }
+    } else if (existing) {
+      existing.remove()
+    }
+  } catch {
+    const fallback = findArticleFont('system')
+    document.documentElement.style.setProperty('--mrrss-article-font', fallback.family)
+  }
+}
 
 async function refreshSidebar(silent = false) {
   if (!silent) {
