@@ -22,6 +22,7 @@ import {
   getImageStorage,
   getOllamaModels,
   getOllamaStatus,
+  getOpenAIModels,
   getOpenAIStatus,
   getPreferences,
   getProfile,
@@ -81,8 +82,9 @@ const providerStatuses = reactive<Record<string, boolean>>({})
 const providerInputs = reactive<Record<string, string>>({})
 const providerMessages = reactive<Record<string, string>>({})
 const ollamaStatus = ref<{ ok: boolean; version?: string; model_count?: number; error?: string } | null>(null)
-const ollamaModels = ref<Array<{ name: string; size: number; parameter_size: string }>>([])
 const openAiStatus = ref<{ ok: boolean; model_count?: number; first_model?: string | null; error?: string } | null>(null)
+const providerModels = reactive<Record<string, Array<{ value: string; label: string }>>>({})
+const providerModelLoading = reactive<Record<string, boolean>>({})
 const retentionStats = ref<RetentionStats | null>(null)
 const previewData = ref<OpmlPreviewResponse | null>(null)
 const previewFile = ref<File | null>(null)
@@ -284,7 +286,7 @@ async function loadAll() {
 
     await Promise.all([
       loadProviderStatuses(),
-      loadOllamaState(),
+      loadOllamaStatus(),
       refreshRetention(),
     ])
   } catch (error) {
@@ -305,17 +307,48 @@ async function loadProviderStatuses() {
   }))
 }
 
-async function loadOllamaState() {
+async function loadOllamaStatus() {
   try {
-    const [status, models] = await Promise.all([
-      getOllamaStatus(),
-      getOllamaModels(),
-    ])
+    const status = await getOllamaStatus()
     ollamaStatus.value = status
-    ollamaModels.value = models.models
   } catch {
     ollamaStatus.value = { ok: false, error: 'Failed to query Ollama' }
-    ollamaModels.value = []
+  }
+}
+
+async function loadProviderModels(provider: string) {
+  if (!provider) return
+  if (provider !== 'ollama' && provider !== 'openai') {
+    providerModels[provider] = []
+    return
+  }
+
+  providerModelLoading[provider] = true
+  try {
+    if (provider === 'ollama') {
+      const models = await getOllamaModels()
+      providerModels.ollama = models.models.map(model => ({ value: model.name, label: model.name }))
+      return
+    }
+    const response = await getOpenAIModels()
+    providerModels.openai = response.models.map(model => ({
+      value: model.id,
+      label: model.id,
+    }))
+  } catch {
+    if (provider === 'openai') providerModels.openai = []
+  } finally {
+    providerModelLoading[provider] = false
+  }
+}
+
+async function onModelDropdownOpen(providerKey: string, modelKey: string) {
+  const provider = prefs[providerKey]
+  if (!provider) return
+  await loadProviderModels(provider)
+  const available = getModelList(provider)
+  if (available[0] && !available.some(model => model.value === prefs[modelKey])) {
+    prefs[modelKey] = available[0].value
   }
 }
 
@@ -626,15 +659,12 @@ async function purgeRetentionNow() {
   }
 }
 
-function getModelList(provider: string) {
+function getStaticModelList(provider: string) {
   if (provider === 'claude-code') {
     return (MODELS_BY_PROVIDER.anthropic ?? []).flatMap(group => group.models.map(model => ({
       value: model.value,
       label: `${group.group} · ${model.label}`,
     })))
-  }
-  if (provider === 'ollama') {
-    return ollamaModels.value.map(model => ({ value: model.name, label: model.name }))
   }
   return (MODELS_BY_PROVIDER[provider] ?? []).flatMap(group => group.models.map(model => ({
     value: model.value,
@@ -642,44 +672,77 @@ function getModelList(provider: string) {
   })))
 }
 
+function getModelList(provider: string) {
+  const dynamic = providerModels[provider]
+  if (dynamic?.length) return dynamic
+  return getStaticModelList(provider)
+}
+
 watch(() => prefs['chat.provider'], (provider) => {
+  const available = getModelList(provider)
   if (provider === 'ollama') {
-    if (!prefs['chat.model'] && ollamaModels.value[0]) prefs['chat.model'] = ollamaModels.value[0].name
+    if (available[0] && !available.some(model => model.value === prefs['chat.model'])) {
+      prefs['chat.model'] = available[0].value
+    }
     return
   }
   if (provider === 'claude-code') {
     prefs['chat.model'] = DEFAULT_MODELS['claude-code']
     return
   }
-  prefs['chat.model'] = DEFAULT_MODELS[provider] || prefs['chat.model']
+  if (available.some(model => model.value === DEFAULT_MODELS[provider])) {
+    prefs['chat.model'] = DEFAULT_MODELS[provider]
+    return
+  }
+  if (!available.some(model => model.value === prefs['chat.model']) && available[0]) {
+    prefs['chat.model'] = available[0].value
+  }
 })
 
 watch(() => prefs['summary.provider'], (provider) => {
+  const available = getModelList(provider)
   if (provider === 'ollama') {
-    if (!prefs['summary.model'] && ollamaModels.value[0]) prefs['summary.model'] = ollamaModels.value[0].name
+    if (available[0] && !available.some(model => model.value === prefs['summary.model'])) {
+      prefs['summary.model'] = available[0].value
+    }
     return
   }
   if (provider === 'claude-code') {
     prefs['summary.model'] = DEFAULT_MODELS['claude-code']
     return
   }
-  prefs['summary.model'] = DEFAULT_MODELS[provider] || prefs['summary.model']
+  if (available.some(model => model.value === DEFAULT_MODELS[provider])) {
+    prefs['summary.model'] = DEFAULT_MODELS[provider]
+    return
+  }
+  if (!available.some(model => model.value === prefs['summary.model']) && available[0]) {
+    prefs['summary.model'] = available[0].value
+  }
 })
 
 watch(() => prefs['translate.provider'], (provider) => {
+  const available = getModelList(provider)
   if (provider === 'google-translate' || provider === 'deepl') {
     prefs['translate.model'] = ''
     return
   }
   if (provider === 'ollama') {
-    if (!prefs['translate.model'] && ollamaModels.value[0]) prefs['translate.model'] = ollamaModels.value[0].name
+    if (available[0] && !available.some(model => model.value === prefs['translate.model'])) {
+      prefs['translate.model'] = available[0].value
+    }
     return
   }
   if (provider === 'claude-code') {
     prefs['translate.model'] = DEFAULT_MODELS['claude-code']
     return
   }
-  prefs['translate.model'] = DEFAULT_MODELS[provider] || prefs['translate.model']
+  if (available.some(model => model.value === DEFAULT_MODELS[provider])) {
+    prefs['translate.model'] = DEFAULT_MODELS[provider]
+    return
+  }
+  if (!available.some(model => model.value === prefs['translate.model']) && available[0]) {
+    prefs['translate.model'] = available[0].value
+  }
 })
 </script>
 
@@ -914,7 +977,12 @@ watch(() => prefs['translate.provider'], (provider) => {
               </label>
               <label class="settings-field">
                 <span>Chat model</span>
-                <select v-model="prefs['chat.model']">
+                <select
+                  v-model="prefs['chat.model']"
+                  @focus="onModelDropdownOpen('chat.provider', 'chat.model')"
+                  @mousedown="onModelDropdownOpen('chat.provider', 'chat.model')"
+                >
+                  <option v-if="providerModelLoading[prefs['chat.provider']]" value="" disabled>Loading models...</option>
                   <option v-for="model in currentChatModels" :key="model.value" :value="model.value">
                     {{ model.label }}
                   </option>
@@ -930,7 +998,12 @@ watch(() => prefs['translate.provider'], (provider) => {
               </label>
               <label class="settings-field">
                 <span>Summary model</span>
-                <select v-model="prefs['summary.model']">
+                <select
+                  v-model="prefs['summary.model']"
+                  @focus="onModelDropdownOpen('summary.provider', 'summary.model')"
+                  @mousedown="onModelDropdownOpen('summary.provider', 'summary.model')"
+                >
+                  <option v-if="providerModelLoading[prefs['summary.provider']]" value="" disabled>Loading models...</option>
                   <option v-for="model in currentSummaryModels" :key="model.value" :value="model.value">
                     {{ model.label }}
                   </option>
@@ -946,7 +1019,12 @@ watch(() => prefs['translate.provider'], (provider) => {
               </label>
               <label v-if="prefs['translate.provider'] !== 'google-translate' && prefs['translate.provider'] !== 'deepl'" class="settings-field">
                 <span>Translate model</span>
-                <select v-model="prefs['translate.model']">
+                <select
+                  v-model="prefs['translate.model']"
+                  @focus="onModelDropdownOpen('translate.provider', 'translate.model')"
+                  @mousedown="onModelDropdownOpen('translate.provider', 'translate.model')"
+                >
+                  <option v-if="providerModelLoading[prefs['translate.provider']]" value="" disabled>Loading models...</option>
                   <option v-for="model in currentTranslateModels" :key="model.value" :value="model.value">
                     {{ model.label }}
                   </option>

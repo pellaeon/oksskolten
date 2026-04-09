@@ -540,6 +540,10 @@ export function getOpenAIStatus() {
   return request<{ ok: boolean; model_count?: number; first_model?: string | null; error?: string }>('/api/settings/openai/status')
 }
 
+export function getOpenAIModels() {
+  return request<{ models: Array<{ id: string }> }>('/api/settings/openai/models')
+}
+
 export function changePassword(body: { currentPassword?: string; newPassword: string }) {
   return request<{ ok: true; token: string }>('/api/auth/password/change', {
     method: 'POST',

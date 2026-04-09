@@ -87,6 +87,20 @@ describe('PATCH /api/settings/preferences — provider-model validation', () => 
     expect(res.statusCode).toBe(200)
   })
 
+  it('accepts custom model IDs for openai provider', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: {
+        'summary.provider': 'openai',
+        'summary.model': 'Huihui-Qwen3.5-27B-Claude-4.6-Opus-abliterated-4bit',
+      },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()['summary.model']).toBe('Huihui-Qwen3.5-27B-Claude-4.6-Opus-abliterated-4bit')
+  })
+
   it('rejects model that does not belong to provider', async () => {
     const res = await app.inject({
       method: 'PATCH',

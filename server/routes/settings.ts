@@ -107,8 +107,8 @@ function validateProviderModel(body: Record<string, unknown>): string | null {
     const model = body[modelKey] !== undefined ? String(body[modelKey]) : getSetting(modelKey)
     const provider = body[providerKey] !== undefined ? String(body[providerKey]) : getSetting(providerKey)
     if (!model || !provider) continue
-    // google-translate, deepl, and ollama have no static model list
-    if (provider === 'google-translate' || provider === 'deepl' || provider === 'ollama') continue
+    // google-translate, deepl, ollama, and openai can use dynamic model lists
+    if (provider === 'google-translate' || provider === 'deepl' || provider === 'ollama' || provider === 'openai') continue
     // claude-code uses anthropic model IDs
     const effectiveProvider = provider === 'claude-code' ? 'anthropic' : provider
     const allowedModels = getModelValues(effectiveProvider)
@@ -212,13 +212,13 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
       }
       const allowed = PREF_ALLOWED[key]
       if (allowed && !allowed.includes(value)) {
-        // Skip static model list check when provider is ollama (dynamic models)
+        // Skip static model list check when provider has dynamic models
         const modelKeyPair = PROVIDER_MODEL_PAIRS.find(p => p.modelKey === key)
         if (modelKeyPair) {
           const provider = body[modelKeyPair.providerKey] !== undefined
             ? String(body[modelKeyPair.providerKey])
             : getSetting(modelKeyPair.providerKey)
-          if (provider === 'ollama') {
+          if (provider === 'ollama' || provider === 'openai') {
             upsertSetting(key, value)
             updated = true
             continue
@@ -678,6 +678,39 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Connection failed'
       reply.send({ ok: false, error: message })
+    }
+  })
+
+  api.get('/api/settings/openai/models', async (_request, reply) => {
+    const baseUrl = (getSetting('openai.base_url') || '').trim()
+    const apiKey = (getSetting('api_key.openai') || '').trim()
+
+    if (!baseUrl || !apiKey) {
+      reply.send({ models: [] })
+      return
+    }
+
+    try {
+      const modelsUrl = new URL('./models', baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`).toString()
+      const res = await fetch(modelsUrl, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          Accept: 'application/json',
+        },
+        signal: AbortSignal.timeout(5_000),
+      })
+      if (!res.ok) {
+        reply.send({ models: [] })
+        return
+      }
+      const data = await res.json() as { data?: Array<{ id?: string }> }
+      const models = (data.data || [])
+        .map(item => item.id || '')
+        .filter(Boolean)
+        .map(id => ({ id }))
+      reply.send({ models })
+    } catch {
+      reply.send({ models: [] })
     }
   })
 }
