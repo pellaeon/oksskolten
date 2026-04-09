@@ -231,6 +231,32 @@ export function getFeeds() {
   return request<FeedResponse>('/api/feeds')
 }
 
+export async function updateAllFeeds() {
+  const token = getAuthToken()
+  const response = await fetch('/api/admin/fetch-all', {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  })
+
+  if (!response.ok) {
+    let message = `${response.status} ${response.statusText}`
+    try {
+      const data = await response.json() as { error?: string }
+      if (data.error) message = data.error
+    } catch {
+      // keep HTTP status text
+    }
+    throw new Error(message)
+  }
+
+  if (!response.body) return
+  const reader = response.body.getReader()
+  while (true) {
+    const { done } = await reader.read()
+    if (done) break
+  }
+}
+
 export function getCategories() {
   return request<{ categories: Category[] }>('/api/categories')
 }

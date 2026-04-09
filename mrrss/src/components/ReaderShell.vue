@@ -22,6 +22,7 @@ import {
   searchArticles,
   summarizeArticle,
   translateArticle,
+  updateAllFeeds,
   type StatsResponse,
 } from '@mrrss/lib/api'
 import ArticleDetailPane from './ArticleDetailPane.vue'
@@ -100,6 +101,7 @@ let searchRetryTimer: ReturnType<typeof setTimeout> | null = null
 let searchAbortController: AbortController | null = null
 const searchResultsScrollbarVisible = ref(false)
 let searchResultsScrollbarHideTimer: ReturnType<typeof setTimeout> | null = null
+const updatingAllFeeds = ref(false)
 
 const deferredUnreadAutoReadIds = new Set<number>()
 const deferredUnreadManualReadIds = new Set<number>()
@@ -412,6 +414,21 @@ async function refreshSidebar(silent = false) {
     sidebarError.value = err instanceof Error ? err.message : 'Failed to load sidebar data.'
   } finally {
     if (!silent || sidebarLoading.value) sidebarLoading.value = false
+  }
+}
+
+async function handleUpdateFeeds() {
+  if (updatingAllFeeds.value) return
+  updatingAllFeeds.value = true
+  try {
+    await updateAllFeeds()
+    await refreshSidebar(true)
+    await loadArticles()
+    showMessage('success', 'Feeds updated')
+  } catch (error) {
+    showMessage('error', error instanceof Error ? error.message : 'Failed to update feeds')
+  } finally {
+    updatingAllFeeds.value = false
   }
 }
 
@@ -1188,7 +1205,7 @@ function scheduleHideArticleListScrollbar() {
           <h2>Feeds</h2>
         </div>
         <div class="pane-actions">
-          <button class="pane-icon-button" type="button" title="Refresh" @click="refreshSidebar">
+          <button class="pane-icon-button" type="button" title="Update feeds" :disabled="updatingAllFeeds" @click="handleUpdateFeeds">
             <svg viewBox="0 0 256 256" aria-hidden="true">
               <path
                 d="M240,56v48a8,8,0,0,1-8,8H184a8,8,0,0,1,0-16H211.4L184.81,71.64l-.25-.24a80,80,0,1,0-1.67,114.78,8,8,0,0,1,11,11.63A95.44,95.44,0,0,1,128,224h-1.32A96,96,0,1,1,195.75,60L224,85.8V56a8,8,0,1,1,16,0Z"
