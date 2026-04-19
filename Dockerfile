@@ -17,12 +17,12 @@ WORKDIR /app
 FROM deps AS build
 
 COPY . .
-RUN npm run build
+RUN npm run build && npm run build:mrrss
 
 FROM deps AS build-server
 
 COPY . .
-RUN npm run build && npm run build:server
+RUN npm run build && npm run build:mrrss && npm run build:server
 
 FROM base AS runtime
 
@@ -49,6 +49,18 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:3000/api/health || exit 1
 CMD ["npx", "tsx", "--dns-result-order=ipv4first", "server/index.ts"]
+
+FROM nginx:1.27-alpine AS runtime-frontend
+
+COPY nginx/frontend.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html
+EXPOSE 80
+
+FROM nginx:1.27-alpine AS runtime-mrrss-frontend
+
+COPY nginx/mrrss-frontend.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist-mrrss /usr/share/nginx/html
+EXPOSE 80
 
 FROM base AS runtime-compiled
 

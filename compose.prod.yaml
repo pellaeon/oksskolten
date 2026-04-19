@@ -29,8 +29,28 @@ services:
     ports: !override []
 
   frontend:
-    deploy:
-      replicas: 0
+    build:
+      target: runtime-frontend
+    command: []
+    restart: unless-stopped
+    volumes: !override []
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      server:
+        condition: service_healthy
+
+  frontend-mrrss:
+    build:
+      target: runtime-mrrss-frontend
+    command: []
+    restart: unless-stopped
+    volumes: !override []
+    ports:
+      - "${MRRSS_FRONTEND_PORT:-5174}:80"
+    depends_on:
+      server:
+        condition: service_healthy
 
   cloudflared:
     image: cloudflare/cloudflared
