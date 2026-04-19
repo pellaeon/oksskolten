@@ -29,6 +29,7 @@ services:
     ports: !override []
 
   frontend:
+    profiles: ["ui"]
     build:
       target: runtime-frontend
     command: []
@@ -41,6 +42,7 @@ services:
         condition: service_healthy
 
   frontend-mrrss:
+    profiles: ["ui"]
     build:
       target: runtime-mrrss-frontend
     command: []

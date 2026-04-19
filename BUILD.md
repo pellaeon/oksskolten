@@ -20,3 +20,7 @@ mkdir -p dist dist-mrrss
 cp -r build-out/dist/. dist/
 cp -r build-out/dist-mrrss/. dist-mrrss/
 ```
+
+- Default docker compose -f compose.yaml -f compose.prod.yaml up -d starts backend/API services only (no frontend containers).
+- Frontends will start only if you explicitly enable the profile, e.g. --profile ui.
+
