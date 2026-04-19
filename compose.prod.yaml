@@ -34,7 +34,7 @@ services:
     command: []
     restart: unless-stopped
     volumes: !override []
-    ports:
+    ports: !override
       - "${FRONTEND_PORT:-5173}:80"
     depends_on:
       server:
@@ -46,7 +46,7 @@ services:
     command: []
     restart: unless-stopped
     volumes: !override []
-    ports:
+    ports: !override
       - "${MRRSS_FRONTEND_PORT:-5174}:80"
     depends_on:
       server:
