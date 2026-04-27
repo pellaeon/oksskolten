@@ -19,6 +19,11 @@ FROM deps AS build
 COPY . .
 RUN npm run build && npm run build:mrrss
 
+FROM scratch AS export-spa
+
+COPY --from=build /app/dist /dist
+COPY --from=build /app/dist-mrrss /dist-mrrss
+
 FROM deps AS build-server
 
 COPY . .
